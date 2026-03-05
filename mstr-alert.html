@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>MSTR Brain 🧠</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700;800&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f0f2f7; --c1:#e8eaf2; --c2:#ffffff; --c3:#f5f6fb; --border:#d8dae8;
+  --or:#e07b00; --gr:#007a52; --re:#c8002a; --ye:#b07800;
+  --bl:#1a6abf; --pu:#7c3aed; --tx:#1a1c2e; --mu:#7a7c9a; --mub:#4a4c6a;
+  --mono:'JetBrains Mono',monospace; --disp:'Bebas Neue',sans-serif;
+  --r:14px; --rs:9px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{min-height:100%;background:var(--bg);color:var(--tx);font-family:var(--mono);overflow-x:hidden;font-size:14px;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse at 20% 0%,rgba(212,120,15,.06),transparent 50%),
+             radial-gradient(ellipse at 80% 100%,rgba(42,127,212,.04),transparent 50%);}
+.app{position:relative;z-index:1;padding-bottom:80px;max-width:480px;margin:0 auto;}
+
+/* ── TOPBAR ── */
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:99;background:rgba(244,245,249,.95);backdrop-filter:blur(12px);}
+.logo{font-family:var(--disp);font-size:1.6rem;letter-spacing:.07em;color:#fff;}
+.logo span{color:var(--or);}
+.topbar-meta{text-align:right;font-size:10px;color:var(--mu);line-height:1.8;}
+.topbar-meta b{color:var(--bl);}
+
+/* ── TV WIDGET ── */
+.tv-wrap{border-bottom:1px solid var(--border);}
+
+/* ── PRICE BAR ── */
+.pbar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgba(212,120,15,.06);border-bottom:1px solid rgba(212,120,15,.2);}
+.pbar label{font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;font-weight:600;}
+.pbar input[type=number]{background:transparent;border:none;border-bottom:2px solid var(--or);color:var(--or);font-family:var(--disp);font-size:1.4rem;letter-spacing:.04em;outline:none;width:90px;padding:2px 4px;}
+.pbar .ok{background:var(--or);color:#000;border:none;border-radius:7px;padding:6px 14px;font:700 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;cursor:pointer;transition:opacity .15s;}
+.pbar .ok:active{opacity:.75;}
+.pbar .note{font-size:10px;color:var(--mu);margin-left:auto;}
+
+/* ── SECTION LABEL ── */
+.sl{display:flex;align-items:center;gap:10px;padding:18px 16px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:var(--mu);font-weight:700;}
+.sl::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ── MARKET STATUS BAR ── */
+.mkt-bar{margin:0 16px;display:flex;align-items:center;justify-content:space-between;background:var(--c2);border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05);border-radius:var(--rs);padding:8px 14px;}
+.mkt-status{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--mub);}
+.mkt-dot{width:7px;height:7px;border-radius:50%;background:var(--re);}
+.mkt-dot.open{background:var(--gr);box-shadow:0 0 8px var(--gr);}
+.mkt-next{font-size:10px;color:var(--mu);}
+.refresh-badge{font-size:10px;color:var(--mu);display:flex;align-items:center;gap:5px;}
+.refresh-badge span{color:var(--gr);font-weight:700;}
+
+/* ══ MARKET INTEL TILES ══ */
+.intel{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 16px;}
+.itile{background:var(--c2);border:1px solid var(--border);border-radius:var(--r);padding:14px 12px;position:relative;overflow:hidden;transition:border-color .4s;}
+.itile.pulse-g{border-color:rgba(0,229,160,.4);}
+.itile.pulse-r{border-color:rgba(255,69,96,.4);}
+.itile.pulse-y{border-color:rgba(255,214,10,.35);}
+.it-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--mu);margin-bottom:6px;font-weight:600;}
+.it-val{font-family:var(--disp);font-size:1.65rem;line-height:1;letter-spacing:.04em;}
+.it-val.g{color:var(--gr);}.it-val.o{color:var(--or);}.it-val.r{color:var(--re);}.it-val.y{color:var(--ye);}.it-val.b{color:var(--bl);}.it-val.p{color:var(--pu);}.it-val.w{color:#fff;}
+.it-sub{font-size:10px;color:var(--mu);margin-top:4px;line-height:1.5;}
+.ibadge{display:inline-block;font-size:10px;padding:3px 8px;border-radius:5px;text-transform:uppercase;letter-spacing:.05em;margin-top:5px;font-weight:700;}
+.EF{background:rgba(200,0,42,.12);color:var(--re);}
+.FE{background:rgba(200,80,0,.1);color:#c05000;}
+.NE{background:rgba(26,106,191,.1);color:var(--bl);}
+.GE{background:rgba(0,122,82,.1);color:var(--gr);}
+.EG{background:rgba(176,120,0,.1);color:var(--ye);}
+.fg-bar{height:4px;background:linear-gradient(to right,#ff4560 0%,#ff8c00 35%,#ffd60a 50%,#7bde4e 70%,#00e5a0 100%);border-radius:100px;margin-top:7px;position:relative;}
+.fg-pin{position:absolute;top:50%;width:9px;height:9px;background:#fff;border-radius:50%;border:2px solid var(--bg);transform:translate(-50%,-50%);box-shadow:0 0 7px rgba(255,255,255,.6);transition:left .6s ease;}
+
+/* ══ X-ACCOUNTS CARD ══ */
+.brain-intel{margin:0 16px;background:var(--c2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.bi-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;user-select:none;border-bottom:1px solid transparent;transition:border-color .2s;}
+.bi-header.open{border-color:var(--border);}
+.bi-htitle{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--mub);}
+.bi-hright{display:flex;align-items:center;gap:10px;}
+.bi-overall{font-size:10px;padding:3px 10px;border-radius:100px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;}
+.bi-tog{font-size:.8rem;color:var(--mu);transition:transform .2s;}
+.bi-header.open .bi-tog{transform:rotate(180deg);}
+.bi-body{display:none;padding:14px 16px;}
+.bi-body.open{display:block;}
+.acc-row{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid rgba(0,0,0,.06);}
+.acc-row:last-child{border-bottom:none;padding-bottom:0;}
+.acc-ico{font-size:1.3rem;flex-shrink:0;margin-top:2px;}
+.acc-name{font-size:12px;font-weight:700;color:#fff;line-height:1.3;}
+.acc-handle{font-size:10px;color:var(--bl);margin-bottom:4px;}
+.acc-txt{font-size:11px;color:var(--mub);line-height:1.7;}
+.acc-txt b,.acc-txt .og{color:var(--or);font-weight:600;}
+.acc-txt .gg{color:var(--gr);font-weight:600;}
+.acc-txt .rg{color:var(--re);font-weight:600;}
+.acc-txt .yg{color:var(--ye);font-weight:600;}
+.sig-pill{display:inline-block;font-size:10px;padding:2px 8px;border-radius:5px;text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-top:5px;}
+.s-bull{background:rgba(0,122,82,.1);color:var(--gr);}
+.s-bear{background:rgba(200,0,42,.1);color:var(--re);}
+.s-neut{background:rgba(26,106,191,.1);color:var(--bl);}
+.s-watch{background:rgba(176,120,0,.1);color:var(--ye);}
+.s-accum{background:rgba(124,58,237,.1);color:var(--pu);}
+
+/* ══ DELTA ENGINE ══ */
+.delta-card{margin:0 16px;background:var(--c2);border:1px solid var(--border);border-radius:var(--r);padding:18px;position:relative;overflow:hidden;}
+.delta-card::after{content:'Δ';position:absolute;right:6px;top:-16px;font-family:var(--disp);font-size:9rem;color:rgba(212,120,15,.06);pointer-events:none;line-height:1;}
+.dc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+.dc-top-l h2{font-family:var(--disp);font-size:1.1rem;letter-spacing:.07em;color:var(--mub);}
+.dc-top-l p{font-size:10px;color:var(--mu);margin-top:3px;}
+.dc-top-r{text-align:right;}
+.dc-top-r .ivv{font-family:var(--disp);font-size:1.3rem;color:var(--pu);}
+.dc-top-r .ivl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.07em;}
+
+.delta-hero{text-align:center;padding:6px 0 14px;}
+.d-big{font-family:var(--disp);font-size:5.5rem;letter-spacing:.02em;line-height:1;transition:color .5s;}
+.d-big.safe{color:var(--gr);}.d-big.mid{color:var(--ye);}.d-big.hot{color:var(--or);}
+.d-mode{font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:var(--mu);margin-top:-4px;}
+.d-pct{font-size:11px;color:var(--mu);margin-top:6px;}
+.d-pct b{color:var(--tx);}
+
+.d-track-wrap{margin:0 0 14px;}
+.d-track-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--mu);margin-bottom:5px;}
+.d-track{height:6px;background:linear-gradient(to right,var(--gr),var(--ye),var(--or));border-radius:100px;position:relative;}
+.d-pin{position:absolute;top:50%;width:14px;height:14px;background:#fff;border-radius:50%;border:2px solid var(--bg);transform:translate(-50%,-50%);box-shadow:0 0 10px rgba(255,255,255,.5);transition:left .8s cubic-bezier(.34,1.56,.64,1);}
+
+.d-factors{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:13px;}
+.df{background:rgba(0,0,0,.04);border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px;}
+.df-lbl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;font-weight:600;}
+.df-val{font-family:var(--disp);font-size:.9rem;font-weight:700;letter-spacing:.03em;}
+.df-val.g{color:var(--gr);}.df-val.o{color:var(--or);}.df-val.r{color:var(--re);}.df-val.y{color:var(--ye);}.df-val.b{color:var(--bl);}.df-val.p{color:var(--pu);}
+.df-sub{font-size:10px;color:var(--mu);margin-top:2px;}
+
+.d-reasoning{background:rgba(212,120,15,.05);border:1px solid rgba(212,120,15,.15);border-radius:var(--rs);padding:13px 15px;}
+.dr-item{display:flex;gap:9px;font-size:12px;line-height:1.7;color:var(--mub);margin-bottom:8px;}
+.dr-item:last-child{margin-bottom:0;}
+.dr-item b{color:var(--tx);}
+.dr-verdict{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07);font-size:12px;color:var(--tx);line-height:1.7;}
+.dr-verdict .vo{color:var(--or);font-weight:700;}
+.dr-verdict .vg{color:var(--gr);font-weight:700;}
+
+/* ══ DELTA TABLE ══ */
+.delta-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:11px;}
+.delta-table th{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--mu);padding:5px 8px;text-align:left;border-bottom:2px solid var(--border);}
+.delta-table td{padding:7px 8px;border-bottom:1px solid rgba(0,0,0,.06);vertical-align:middle;}
+.delta-table tr:last-child td{border-bottom:none;}
+.delta-table tr.brain-rec{background:rgba(247,147,26,.1);border-radius:6px;}
+.dt-delta{color:var(--or);font-weight:700;font-size:12px;}
+.dt-strike{color:#fff;font-weight:600;}
+.dt-prem{color:var(--gr);font-weight:600;}
+.dt-total{color:var(--bl);}
+.dt-rec{color:var(--or);font-size:10px;font-weight:700;}
+
+/* ══ BRAIN ACTION CARD ══ */
+.action-card{margin:0 16px;border-radius:var(--r);padding:18px;border:1.5px solid var(--border);background:var(--c2);box-shadow:0 2px 12px rgba(0,0,0,.06);position:relative;overflow:hidden;transition:border-color .4s,box-shadow .4s;}
+.action-card::before{content:'';position:absolute;inset:0;border-radius:var(--r);opacity:0;transition:opacity .5s;pointer-events:none;}
+.ac-safe{border-color:rgba(0,122,82,.35);}   .ac-safe::before{background:radial-gradient(ellipse at top,rgba(0,150,90,.07),transparent 65%);opacity:1;}
+.ac-warn{border-color:rgba(176,120,0,.4);animation:wpulse 2.5s infinite;}  .ac-warn::before{background:radial-gradient(ellipse at top,rgba(176,120,0,.07),transparent 65%);opacity:1;}
+.ac-roll{border-color:rgba(176,120,0,.6);animation:rpulse 1.4s infinite;} .ac-roll::before{background:radial-gradient(ellipse at top,rgba(176,120,0,.1),transparent 65%);opacity:1;}
+.ac-danger{border-color:rgba(200,0,42,.55);animation:dpulse .9s infinite;} .ac-danger::before{background:radial-gradient(ellipse at top,rgba(200,0,42,.1),transparent 65%);opacity:1;}
+.ac-open{border-color:rgba(0,163,114,.5);}  .ac-open::before{background:radial-gradient(ellipse at top,rgba(0,163,114,.07),transparent 65%);opacity:1;}
+.ac-idle{border-color:rgba(77,166,255,.2);}
+@keyframes wpulse{0%,100%{box-shadow:0 0 0 0 rgba(176,120,0,0)}50%{box-shadow:0 0 20px 4px rgba(176,120,0,.18)}}
+@keyframes rpulse{0%,100%{box-shadow:0 0 0 0 rgba(176,120,0,0)}50%{box-shadow:0 0 26px 6px rgba(176,120,0,.24)}}
+@keyframes dpulse{0%,100%{box-shadow:0 0 0 0 rgba(200,0,42,0)}50%{box-shadow:0 0 28px 8px rgba(200,0,42,.22)}}
+
+.ac-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+.ac-em{font-size:2rem;}
+.ac-badge{font-size:10px;text-transform:uppercase;letter-spacing:.1em;padding:4px 10px;border-radius:100px;font-weight:700;}
+.ab-g{background:rgba(0,122,82,.1);color:var(--gr);}
+.ab-r{background:rgba(200,0,42,.1);color:var(--re);}
+.ab-y{background:rgba(176,120,0,.1);color:var(--ye);}
+.ab-b{background:rgba(26,106,191,.1);color:var(--bl);}
+.ab-o{background:rgba(224,123,0,.1);color:var(--or);}
+.ac-title{font-family:var(--disp);font-size:2rem;letter-spacing:.05em;color:#fff;line-height:1.05;margin-bottom:10px;position:relative;z-index:1;}
+.ac-body{font-size:13px;line-height:1.8;color:var(--tx);position:relative;z-index:1;}
+.gg{color:var(--gr);font-weight:700;}.og{color:var(--or);font-weight:700;}.rg{color:var(--re);font-weight:700;}.yg{color:var(--ye);font-weight:700;}.bg{color:var(--bl);font-weight:700;}
+.steps{margin-top:13px;background:rgba(0,0,0,.04);border-radius:var(--rs);padding:14px;}
+.step{display:flex;gap:10px;margin-bottom:9px;font-size:12px;line-height:1.6;align-items:flex-start;}
+.step:last-child{margin-bottom:0;}
+.snum{font-size:10px;background:rgba(212,120,15,.1);border:1px solid rgba(212,120,15,.25);border-radius:50%;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;margin-top:1px;color:var(--or);}
+
+/* ══ GAUGES ══ */
+.gauges{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 16px;}
+.gauge{background:var(--c2);border:1px solid var(--border);border-radius:var(--r);padding:14px;}
+.g-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--mu);margin-bottom:7px;font-weight:600;}
+.g-val{font-family:var(--disp);font-size:1.7rem;line-height:1;letter-spacing:.04em;}
+.g-val.g{color:var(--gr);}.g-val.o{color:var(--or);}.g-val.r{color:var(--re);}.g-val.y{color:var(--ye);}.g-val.w{color:#fff;}.g-val.b{color:var(--bl);}
+.g-sub{font-size:10px;color:var(--mu);margin-top:5px;}
+
+/* PROGRESS */
+.progress{margin:0 16px;}
+.p-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;font-weight:600;}
+.p-track{height:6px;background:var(--border);border-radius:100px;overflow:hidden;}
+.p-fill{height:100%;border-radius:100px;transition:width .8s ease,background .5s ease;}
+.p-marks{display:flex;justify-content:space-between;font-size:10px;color:var(--mu);margin-top:4px;}
+
+/* ══ SCENARIO TABS ══ */
+.sc-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:0 16px;}
+.sct{background:var(--c2);border:1px solid var(--border);border-radius:var(--rs);padding:10px 4px;text-align:center;cursor:pointer;transition:all .2s;user-select:none;}
+.sct:active{transform:scale(.95);}
+.sct .icon{font-size:1.2rem;display:block;margin-bottom:3px;}
+.sct .name{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--mu);line-height:1.3;font-weight:600;}
+.sct.act{border-color:var(--or);background:rgba(224,123,0,.08);} .sct.act .name{color:var(--or);}
+.sct.td.act{border-color:var(--gr);background:rgba(0,229,160,.07);} .sct.td.act .name{color:var(--gr);}
+.sct.tf.act{border-color:var(--bl);background:rgba(77,166,255,.07);} .sct.tf.act .name{color:var(--bl);}
+.sct.tu.act{border-color:var(--ye);background:rgba(255,214,10,.07);} .sct.tu.act .name{color:var(--ye);}
+.sct.tm.act{border-color:var(--re);background:rgba(255,69,96,.07);} .sct.tm.act .name{color:var(--re);}
+
+.sc-panel{display:none;margin:7px 16px 0;background:var(--c2);border:1px solid var(--border);border-radius:var(--r);padding:15px;}
+.sc-panel.act{display:block;}
+.sp-top{display:flex;align-items:center;gap:10px;margin-bottom:13px;}
+.sp-ico{font-size:1.6rem;}
+.sp-top h3{font-family:var(--disp);font-size:1.2rem;letter-spacing:.04em;color:#fff;}
+.sp-top p{font-size:10px;color:var(--mu);margin-top:2px;}
+.sp-mets{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:11px;}
+.sm{background:rgba(0,0,0,.03);border-radius:var(--rs);padding:10px 12px;border:1px solid var(--border);}
+.sm-lbl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;font-weight:600;}
+.sm-val{font-family:var(--disp);font-size:1.1rem;letter-spacing:.03em;}
+.sm-val.g{color:var(--gr);}.sm-val.o{color:var(--or);}.sm-val.r{color:var(--re);}.sm-val.y{color:var(--ye);}.sm-val.b{color:var(--bl);}
+.sm-sub{font-size:10px;color:var(--mu);margin-top:3px;}
+.sp-verd{border-radius:var(--rs);padding:11px 13px;font-size:12px;line-height:1.75;margin-bottom:11px;}
+.vg{background:rgba(0,229,160,.07);border:1px solid rgba(0,229,160,.2);}
+.vb{background:rgba(77,166,255,.07);border:1px solid rgba(77,166,255,.2);}
+.vy{background:rgba(255,214,10,.07);border:1px solid rgba(255,214,10,.2);}
+.vr{background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.25);}
+.sp-acts{display:flex;flex-direction:column;gap:6px;}
+.spa{display:flex;gap:9px;font-size:12px;line-height:1.6;align-items:flex-start;}
+.san{font-size:10px;background:rgba(247,147,26,.12);border:1px solid rgba(247,147,26,.25);border-radius:50%;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;margin-top:1px;color:var(--or);}
+
+/* ══ SETTINGS ══ */
+.set-wrap{margin:0 16px;background:var(--c2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.set-hdr{padding:13px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--mub);display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;border-bottom:1px solid transparent;transition:border-color .2s;font-weight:600;}
+.set-hdr.open{border-color:var(--border);}
+.set-tog{transition:transform .2s;font-size:.9rem;}
+.set-hdr.open .set-tog{transform:rotate(180deg);}
+.set-body{display:none;padding:16px;}
+.set-body.open{display:block;}
+.fr{margin-bottom:13px;}
+.fr:last-child{margin-bottom:0;}
+.fr label{display:block;font-size:10px;color:var(--mub);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;font-weight:700;}
+.fr input,.fr select{width:100%;background:rgba(255,255,255,.8);border:1px solid var(--border);border-radius:var(--rs);padding:10px 13px;color:var(--tx);font-family:var(--mono);font-size:13px;outline:none;transition:border-color .2s;}
+.fr input:focus,.fr select:focus{border-color:var(--or);}
+.fr select option{background:#f0f2f7;}
+.check-row{display:flex;align-items:center;gap:10px;}
+.check-row input[type=checkbox]{width:17px;height:17px;accent-color:var(--or);cursor:pointer;flex-shrink:0;}
+.check-row span{font-size:12px;color:var(--mub);}
+.save-btn{width:100%;background:var(--or);color:#000;border:none;border-radius:var(--rs);padding:13px;font-family:var(--disp);font-size:1rem;letter-spacing:.1em;cursor:pointer;margin-top:14px;transition:opacity .2s,transform .1s;font-weight:700;}
+.save-btn:active{opacity:.8;transform:scale(.98);}
+
+/* ══ LOG ══ */
+.log-wrap{margin:0 16px;}
+.log-items{display:flex;flex-direction:column;gap:6px;}
+.li{background:var(--c3);border:1px solid var(--border);border-radius:var(--rs);padding:9px 13px;display:flex;gap:10px;align-items:flex-start;}
+.li-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+.li-dot.g{background:var(--gr);}.li-dot.o{background:var(--or);}.li-dot.r{background:var(--re);}.li-dot.b{background:var(--bl);}
+.li-txt{font-size:12px;line-height:1.55;}
+.li-time{font-size:10px;color:var(--mu);margin-top:2px;}
+
+/* ══ HOWTO ══ */
+.howto{margin:0 16px;background:rgba(42,127,212,.04);border:1px solid rgba(42,127,212,.14);border-radius:var(--r);padding:14px;}
+.howto .ht{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--bl);margin-bottom:8px;font-weight:700;}
+.howto p{font-size:12px;color:var(--mub);line-height:1.8;}
+.howto strong{color:var(--tx);}
+.last-upd{text-align:center;font-size:10px;color:var(--mu);padding:8px 0 0;}
+
+
+/* ── DELTA TABLE ── */
+.dtbl{width:100%;border-collapse:collapse;font-size:.66rem;font-family:var(--mono);margin-top:10px;}
+.dtbl td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.05);}
+.dtbl tr:last-child td{border-bottom:none;}
+.dtbl .brain-row td{background:rgba(247,147,26,.08);}
+.dtbl .brain-badge{display:inline-block;font-size:.55rem;background:rgba(247,147,26,.15);color:var(--or);padding:1px 5px;border-radius:3px;font-weight:700;margin-left:4px;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.app>*{animation:fadeUp .3s ease both;}
+/* ── DELTA SELECTION TABLE ── */
+.dtbl{width:100%;border-collapse:collapse;font-size:.67rem;font-family:var(--mono);margin-top:10px;border-radius:8px;overflow:hidden;}
+.dtbl td{padding:7px 9px;border-bottom:1px solid rgba(255,255,255,.05);}
+.dtbl tr:last-child td{border-bottom:none;}
+.dtbl .brain-row td{background:rgba(247,147,26,.1);}
+.dtbl .brain-lbl{color:var(--or);font-weight:700;font-size:.62rem;background:rgba(247,147,26,.12);padding:2px 6px;border-radius:4px;}
+
+</style>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+</head>
+<body><div class="app">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">MSTR <span>BRAIN</span></div>
+  <div class="topbar-meta" id="apiIndicator">Render API · CoinGecko · Alt.me<br>X: Saylor · <b>Micro2Macro</b> · Killa · MvdP</div>
+</div>
+
+<!-- TV WIDGET -->
+<div class="tv-wrap">
+  <div class="tradingview-widget-container">
+    <div class="tradingview-widget-container__widget"></div>
+    <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-single-quote.js" async>
+    {"symbol":"NASDAQ:MSTR","width":"100%","colorTheme":"dark","isTransparent":true,"locale":"de_DE"}
+    </script>
+  </div>
+</div>
+
+<!-- PRICE INPUT -->
+<div class="pbar">
+  <label>MSTR ($)</label>
+  <input type="number" id="mstrPrice" placeholder="146" step="0.5">
+  <button class="ok" onclick="applyPrice()">OK</button>
+  <span class="note" id="mstrNote">vom TradingView ablesen ↑</span>
+</div>
+
+<!-- LIVE INTEL -->
+<div class="sl">🌍 Live Markt-Intelligence</div>
+<div class="intel">
+  <div class="itile" id="fgTile">
+    <div class="it-lbl">Fear &amp; Greed</div>
+    <div class="it-val r" id="fgVal">—</div>
+    <div class="it-sub" id="fgLbl">Wird geladen...</div>
+    <div class="fg-bar"><div class="fg-pin" id="fgPin" style="left:15%"></div></div>
+    <div class="ibadge EF" id="fgBadge">Extreme Fear</div>
+  </div>
+  <div class="itile" id="btcTile">
+    <div class="it-lbl">Bitcoin / USD</div>
+    <div class="it-val w" id="btcVal">—</div>
+    <div class="it-sub" id="btcChg" style="color:var(--gr)">Wird geladen...</div>
+    <div class="ibadge NE" id="btcBadge" style="display:none">—</div>
+  </div>
+  <div class="itile">
+    <div class="it-lbl">BTC Trend</div>
+    <div class="it-val p" id="trendVal">—</div>
+    <div class="it-sub" id="trendSub">Wird berechnet...</div>
+  </div>
+</div>
+<div class="last-upd" id="lastUpd">⏳ Lade Live-Daten...</div>
+
+<!-- BRAIN INTEL (X-Accounts) -->
+<div class="sl">📡 X-Accounts + Brain-Analyse</div>
+<div class="brain-intel">
+  <div class="bi-header" id="biHdr" onclick="toggleBI()">
+    <div class="bi-htitle">Saylor · Micro2Macro · Killa · MvdP · Brain-Synthese</div>
+    <div class="bi-hright">
+      <div class="bi-overall NE" id="biOverall">Laden...</div>
+      <div class="bi-tog" id="biTog">▼</div>
+    </div>
+  </div>
+  <div class="bi-body" id="biBody">
+    <div id="accContent"></div>
+  </div>
+</div>
+
+<!-- DELTA ENGINE -->
+<div class="sl">🧠 Adaptive Delta Engine</div>
+<div class="delta-card">
+  <div class="dc-top">
+    <div class="dc-top-l">
+      <h2>EMPFOHLENES DELTA</h2>
+      <p id="dcSub">Warte auf Daten...</p>
+    </div>
+    <div class="dc-top-r">
+      <div class="ivl">Implied Volatility</div>
+      <div class="ivv" id="ivDisp">—</div>
+      <div class="ivl">IV Rank: <span id="ivrDisp">—</span></div>
+    </div>
+  </div>
+  <div class="delta-hero">
+    <div class="d-big safe" id="dBig">—</div>
+    <div class="d-mode" id="dMode">Berechne...</div>
+    <div class="d-pct">Zuweisung-Wahrscheinlichkeit: <b id="dPct">—</b></div>
+  </div>
+  <div class="d-track-wrap">
+    <div class="d-track-lbl">
+      <span style="color:var(--gr)">0.05 Ultra-Safe</span>
+      <span style="color:var(--ye)">0.10 Hermeslux</span>
+      <span style="color:var(--or)">0.12 Aktiv</span>
+    </div>
+    <div class="d-track"><div class="d-pin" id="dPin" style="left:30%"></div></div>
+  </div>
+  <div class="d-factors" id="dFactors"></div>
+  <div class="d-reasoning" id="dReasoning"></div>
+</div>
+
+<!-- ACTION CARD -->
+<div class="sl">📋 Handlungsempfehlung</div>
+<div class="action-card ac-idle" id="actionCard">
+  <div class="ac-top">
+    <span class="ac-em" id="acEm">🧠</span>
+    <span class="ac-badge ab-b" id="acBadge">Bereit</span>
+  </div>
+  <div class="ac-title" id="acTitle">KURS EINGEBEN</div>
+  <div class="ac-body" id="acBody">MSTR-Kurs vom TradingView-Widget ablesen und oben eintragen.</div>
+</div>
+
+<!-- POSITION GAUGES -->
+<div class="sl">📊 Position Monitor</div>
+<div class="gauges">
+  <div class="gauge"><div class="g-lbl">Dein Strike</div><div class="g-val o" id="gStrike">—</div><div class="g-sub" id="gStrikeSub">Nicht gesetzt</div></div>
+  <div class="gauge"><div class="g-lbl">Puffer</div><div class="g-val w" id="gBuf">—</div><div class="g-sub" id="gBufSub">—</div></div>
+  <div class="gauge"><div class="g-lbl">Expiry</div><div class="g-val w" id="gExp">—</div><div class="g-sub">Verfallsdatum</div></div>
+  <div class="gauge"><div class="g-lbl">DTE</div><div class="g-val w" id="gDTE">—</div><div class="g-sub">Tage bis Expiry</div></div>
+</div>
+<div class="progress" style="margin-top:8px;">
+  <div class="p-lbl"><span>Kurs → Strike</span><span id="pPct">—</span></div>
+  <div class="p-track"><div class="p-fill" id="pFill" style="width:0;background:var(--gr)"></div></div>
+  <div class="p-marks"><span id="pL">$—</span><span style="color:var(--ye)">⚠ Roll bei Δ 0.25</span><span id="pR">$—</span></div>
+</div>
+
+<!-- SZENARIEN -->
+<div class="sl">🔭 Was passiert wenn...</div>
+<div class="sc-tabs">
+  <div class="sct td act" onclick="selSc('d')"><span class="icon">📉</span><span class="name">Sinkt</span></div>
+  <div class="sct tf"     onclick="selSc('f')"><span class="icon">➡️</span><span class="name">Stabil</span></div>
+  <div class="sct tu"     onclick="selSc('u')"><span class="icon">📈</span><span class="name">+5–10%</span></div>
+  <div class="sct tm"     onclick="selSc('m')"><span class="icon">🚀</span><span class="name">+20%+</span></div>
+</div>
+<div class="sc-panel act" id="sc-d"></div>
+<div class="sc-panel"     id="sc-f"></div>
+<div class="sc-panel"     id="sc-u"></div>
+<div class="sc-panel"     id="sc-m"></div>
+
+<!-- SETTINGS -->
+<div class="sl">⚙ Einstellungen</div>
+<div class="set-wrap">
+  <div class="set-hdr" id="setHdr" onclick="toggleSet()">
+    <span>Position &amp; Marktdaten</span>
+    <span class="set-tog" id="setTog">▼</span>
+  </div>
+  <div class="set-body" id="setBody">
+    <div class="fr" style="background:rgba(0,163,114,.06);border:1px solid rgba(0,163,114,.2);border-radius:9px;padding:12px 13px;margin-bottom:14px;">
+      <label style="color:var(--gr);">🌐 Render API URL (einmalig eintragen)</label>
+      <input type="url" id="iApiBase" placeholder="https://mstr-brain-api.onrender.com" style="margin-top:6px;">
+      <div style="font-size:10px;color:var(--mu);margin-top:6px;line-height:1.6;">
+        Noch kein Server? Siehe <b>README.md</b> in den heruntergeladenen Dateien.<br>
+        Leer lassen = App nutzt nur BTC + F&G (wie bisher).
+      </div>
+    </div>
+    <div class="fr"><label>Call Strike ($)</label><input type="number" id="iStrike" placeholder="220" step="0.5"></div>
+    <div class="fr"><label>Prämie kassiert pro Aktie ($)</label><input type="number" id="iPrem" placeholder="2.00" step="0.10"></div>
+    <div class="fr"><label>Expiry Datum</label><input type="date" id="iExp"></div>
+    <div class="fr"><label>MSTR Implied Volatility (%) — unusualwhales.com/stock/MSTR/volatility</label><input type="number" id="iIV" value="88" step="1"></div>
+    <div class="fr"><label>IV Rank (0–100)</label><input type="number" id="iIVR" value="43" step="1"></div>
+    <div class="fr"><label>BTC Trend Override (Standard = automatisch aus Live-Daten)</label>
+      <select id="iBTC">
+        <option value="auto" selected>🤖 Automatisch aus F&amp;G + BTC-Preis (empfohlen)</option>
+        <option value="bearish">📉 Bearish / Fallend</option>
+        <option value="neutral">➡️ Neutral / Seitwärts</option>
+        <option value="bullish">📈 Bullish / Steigend</option>
+        <option value="explosive">🚀 Explosiv (+15%+ in 2 Wochen)</option>
+      </select>
+    </div>
+    <div class="fr"><div class="check-row"><input type="checkbox" id="iEarn"><span>Earnings in den nächsten 14 Tagen</span></div></div>
+    <div class="fr"><div class="check-row"><input type="checkbox" id="iNoPos"><span>Kein offener Call — neuen Trade planen</span></div></div>
+    <button class="save-btn" onclick="saveSet()">SPEICHERN &amp; BRAIN UPDATEN</button>
+  </div>
+</div>
+
+<!-- OPTIONSKETTE MANUELL -->
+<div class="sl">📋 Optionskette (von IBKR)</div>
+<div class="set-wrap">
+  <div class="set-hdr" id="chainHdr" onclick="toggleChain()">
+    <span>Echte Strikes &amp; Prämien eintragen</span>
+    <span class="set-tog" id="chainTog">▼</span>
+  </div>
+  <div class="set-body" id="chainBody">
+    <div style="background:rgba(42,127,212,.06);border:1px solid rgba(42,127,212,.18);border-radius:8px;padding:11px 13px;margin-bottom:14px;font-size:11px;line-height:1.75;color:var(--mub);">
+      <b style="color:var(--bl);">📖 So geht's (30 Sekunden in IBKR):</b><br>
+      1. IBKR → Options Chain → MSTR → Calls<br>
+      2. Expiry mit ~40–45 DTE wählen (ca. <b id="chainExpHint">—</b>)<br>
+      3. Für jedes Delta unten: Strike + Bid + Ask eintragen<br>
+      4. Speichern → App zeigt echte Prämien statt Schätzung<br>
+      <span style="color:var(--mu);font-size:10px;">Einmal pro Woche aktualisieren, oder wenn IV sich stark ändert.</span>
+    </div>
+    <div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:10px;">Expiry Datum der eingetragenen Optionen:</div>
+    <div class="fr" style="margin-bottom:16px;"><input type="date" id="iChainExp" placeholder="Expiry"></div>
+    <div style="display:grid;grid-template-columns:60px 1fr 80px 80px;gap:6px;align-items:center;margin-bottom:6px;">
+      <div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Delta</div>
+      <div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Strike ($)</div>
+      <div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Bid ($)</div>
+      <div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Ask ($)</div>
+    </div>
+    <div id="chainInputs"></div>
+    <button class="save-btn" onclick="saveChain()">OPTIONSKETTE SPEICHERN</button>
+    <div id="chainStatus" style="margin-top:9px;font-size:11px;color:var(--mu);text-align:center;min-height:16px;"></div>
+  </div>
+</div>
+
+<!-- EMAIL ALERTS -->
+<div class="sl">📧 E-Mail Benachrichtigungen</div>
+<div class="set-wrap">
+  <div class="set-hdr" id="emailHdr" onclick="toggleEmail()">
+    <span>E-Mail Alarm Setup (kostenlos via EmailJS)</span>
+    <span class="set-tog" id="emailTog">▼</span>
+  </div>
+  <div class="set-body" id="emailBody">
+    <div style="background:rgba(26,106,191,.06);border:1px solid rgba(26,106,191,.18);border-radius:8px;padding:11px 12px;margin-bottom:12px;font-size:.6rem;line-height:1.7;color:var(--mu);">
+      <b style="color:var(--bl);">📋 Einmalige Einrichtung (3 Minuten):</b><br>
+      1. Gehe zu <b style="color:#fff">emailjs.com</b> → kostenlos registrieren (200 Mails/Monat gratis)<br>
+      2. "Add Service" → Gmail oder andere E-Mail wählen → verbinden<br>
+      3. "Email Templates" → neues Template erstellen:<br>
+      &nbsp;&nbsp;&nbsp;Subject: <code style="color:var(--or)">{{subject}}</code> &nbsp; Body: <code style="color(--or)">{{message}}</code><br>
+      4. Template-ID + Service-ID + Public Key kopieren und unten eintragen<br>
+      5. Speichern → Test-Mail senden → fertig!
+    </div>
+    <div class="fr"><label>EmailJS Public Key</label><input type="text" id="iEJKey" placeholder="z.B. abc123XYZ_pubkey"></div>
+    <div class="fr"><label>EmailJS Service ID</label><input type="text" id="iEJService" placeholder="z.B. service_gmail_mstr"></div>
+    <div class="fr"><label>EmailJS Template ID</label><input type="text" id="iEJTemplate" placeholder="z.B. template_brain_alert"></div>
+    <div class="fr"><label>Deine E-Mail Adresse (Empfänger)</label><input type="email" id="iEmail" placeholder="deine@email.com"></div>
+    <div class="fr">
+      <label>Alarme senden bei</label>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+        <div class="check-row"><input type="checkbox" id="eRoll" checked><span>⚡ Roll-Alarm (Puffer &lt; 6%)</span></div>
+        <div class="check-row"><input type="checkbox" id="eWarn" checked><span>⚠️ Warnung (Puffer &lt; 12%)</span></div>
+        <div class="check-row"><input type="checkbox" id="eDanger" checked><span>🚨 Kritisch / Gamma / Earnings</span></div>
+        <div class="check-row"><input type="checkbox" id="eProfit"><span>💰 25%-Gewinnmitnahme erreicht</span></div>
+        <div class="check-row"><input type="checkbox" id="eFG"><span>📊 F&amp;G Extremwert (&lt;15 oder &gt;80)</span></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
+      <button class="save-btn" style="margin-top:0" onclick="saveEmail()">SPEICHERN</button>
+      <button class="save-btn" style="margin-top:0;background:var(--bl);color:#fff" onclick="testEmail()">TEST-MAIL</button>
+    </div>
+    <div id="emailStatus" style="margin-top:9px;font-size:.58rem;color:var(--mu);text-align:center;min-height:18px;"></div>
+  </div>
+</div>
+
+<!-- LOG -->
+<div class="sl">📜 Aktivitäts-Log</div>
+<div class="log-wrap"><div class="log-items" id="logItems">
+  <div class="li"><div class="li-dot b"></div><div><div class="li-txt">Brain v5 gestartet — lade Live-Daten...</div><div class="li-time" id="t0"></div></div></div>
+</div></div>
+
+<!-- HOWTO -->
+<div class="sl">📱 Info</div>
+<div class="howto">
+  <div class="ht">Homescreen + tägliches Workflow</div>
+  <p>
+    <strong>iPhone:</strong> Safari → Teilen → "Zum Home-Bildschirm".<br>
+    <strong>Android:</strong> Chrome → ⋮ → "Zum Startbildschirm".<br>
+    <strong>Täglich:</strong> IV + IV Rank auf <strong>unusualwhales.com/stock/MSTR/volatility</strong> prüfen und in Einstellungen eintragen.<br>
+    <strong>Automatisch:</strong> F&amp;G + BTC-Preis werden alle 10 Min. aktualisiert.<br>
+    <strong>X-Accounts:</strong> Micro2Macro, Killa, MvdP, Saylor — werden kontextbasiert aus Live-Daten synthetisiert.
+  </p>
+</div>
+
+</div><!-- .app -->
+<script>
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+// Render API URL — wird in Einstellungen gesetzt
+let API_BASE = localStorage.getItem('mstr_api_base') || '';
+
+const S = {
+  price:null, strike:null, premium:null, expiry:null,
+  iv:88, ivr:43, btcOverride:'auto', earnings:false, noPos:false,
+  optChain:[], // [{delta, strike, bid, ask, mid}]
+  chainExp:null,
+  // live
+  fg:19, fgLabel:'Extreme Fear',
+  btcPrice:71680, btcChange1d:7.25, btcChange7d:-12,
+  trendAuto:'neutral',
+};
+
+const $=id=>document.getElementById(id);
+
+function loadState(){
+  try{
+    const d=JSON.parse(localStorage.getItem('mstr_brain_v5')||'{}');
+    ['price','strike','premium','expiry','iv','ivr','btcOverride','earnings','noPos','optChain','chainExp'].forEach(k=>{if(d[k]!==undefined)S[k]=d[k];});
+    renderChainInputs();
+    if(S.strike) $('iStrike').value=S.strike;
+    if(S.premium) $('iPrem').value=S.premium;
+    if(S.expiry) $('iExp').value=S.expiry;
+    $('iIV').value=S.iv; $('iIVR').value=S.ivr;
+    $('iBTC').value=S.btcOverride;
+    $('iEarn').checked=S.earnings; $('iNoPos').checked=S.noPos;
+    if(S.price) $('mstrPrice').value=S.price;
+    const ab=$('iApiBase'); if(ab) ab.value=API_BASE;
+  }catch(e){}
+}
+
+function saveStateLocal(){
+  try{localStorage.setItem('mstr_brain_v5',JSON.stringify(
+    {price:S.price,strike:S.strike,premium:S.premium,expiry:S.expiry,
+     iv:S.iv,ivr:S.ivr,btcOverride:S.btcOverride,earnings:S.earnings,noPos:S.noPos,optChain:S.optChain,chainExp:S.chainExp}
+  ));}catch(e){}
+}
+
+
+// ══════════════════════════════════════════
+// RENDER API — holt alles auf einmal
+// ══════════════════════════════════════════
+async function fetchAll(){
+  if(!API_BASE){ 
+    // Kein Server — nur BTC + FG wie bisher
+    return Promise.all([fetchFG(), fetchBTC()]);
+  }
+  try{
+    addLog('🌐 Lade Daten vom Server...','b');
+    const r = await fetch(API_BASE+'/all', {signal: AbortSignal.timeout(15000)});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+
+    // MSTR Preis
+    if(d.mstr && d.mstr.price){
+      S.price = d.mstr.price;
+      S.mstrChange = d.mstr.change_pct;
+      $('mstrPrice').value = d.mstr.price;
+      saveStateLocal();
+    }
+
+    // BTC
+    if(d.btc && d.btc.price){
+      S.btcPrice = d.btc.price;
+      S.btcChange1d = d.btc.change_24h || 0;
+      S.btcChange7d = d.btc.change_7d || 0;
+    }
+
+    // Fear & Greed
+    if(d.fg && d.fg.value){
+      S.fg = d.fg.value;
+      S.fgLabel = d.fg.label;
+    }
+
+    // Optionskette
+    if(d.options && d.options.options && d.options.options.length){
+      const opts = d.options.options;
+      // Map to optChain format, find closest delta for each of our target deltas
+      const targets = [0.05,0.06,0.07,0.08,0.09,0.10,0.11,0.12];
+      S.optChain = targets.map(td=>{
+        // Find option with closest delta
+        let best = opts.reduce((a,b)=> Math.abs(b.delta-td)<Math.abs(a.delta-td)?b:a, opts[0]);
+        return {delta:td, strike:best.strike, bid:best.bid, ask:best.ask, mid:best.mid, iv:best.iv};
+      });
+      S.chainExp = d.options.expiry;
+      // Update chain inputs UI
+      renderChainInputs();
+    }
+
+    renderFG(); renderBTC(); computeTrend();
+    const asOf = d.as_of ? new Date(d.as_of).toLocaleTimeString('de-DE') : '—';
+    $('lastUpd').textContent = '✅ Server-Daten · Stand: '+asOf+' UTC · MSTR+Optionen ~15min verzögert';
+    addLog('✅ Server-Daten geladen: MSTR $'+S.price+' · BTC $'+S.btcPrice.toLocaleString('de-DE')+' · '+opts.length+' Optionen','g');
+    updateUI();
+  }catch(e){
+    addLog('⚠️ Server nicht erreichbar ('+e.message+') — nutze Fallback','o');
+    // Fallback auf direkte APIs
+    return Promise.all([fetchFG(), fetchBTC()]);
+  }
+}
+
+// ══════════════════════════════════════════
+// LIVE DATA
+// ══════════════════════════════════════════
+async function fetchFG(){
+  try{
+    const r=await fetch('https://api.alternative.me/fng/?limit=1');
+    const d=await r.json();
+    S.fg=parseInt(d.data[0].value);
+    S.fgLabel=d.data[0].value_classification;
+  }catch(e){/* use defaults */}
+  renderFG(); computeTrend();
+}
+
+async function fetchBTC(){
+  try{
+    const r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_7d_change=true');
+    const d=await r.json();
+    if(d.bitcoin){
+      S.btcPrice=d.bitcoin.usd;
+      S.btcChange1d=d.bitcoin.usd_24h_change||0;
+      S.btcChange7d=d.bitcoin.usd_7d_change||0;
+    }
+  }catch(e){
+    try{ // fallback
+      const r2=await fetch('https://api.coinstats.app/public/v1/coins/bitcoin?currency=USD');
+      const d2=await r2.json();
+      if(d2.coin){S.btcPrice=d2.coin.price;S.btcChange1d=d2.coin.priceChange1d||0;S.btcChange7d=d2.coin.priceChange7d||0;}
+    }catch(e2){/* use defaults */}
+  }
+  renderBTC(); computeTrend();
+}
+
+function renderFG(){
+  const v=S.fg,lbl=S.fgLabel;
+  $('fgVal').textContent=v;
+  $('fgLbl').textContent=lbl;
+  $('fgPin').style.left=v+'%';
+  const el=$('fgVal');
+  el.className='it-val '+(v<=20?'r':v<=40?'y':v<=55?'b':v<=70?'g':'y');
+  const badge=$('fgBadge');
+  if(v<=20){badge.className='ibadge EF';badge.textContent='Extreme Fear';}
+  else if(v<=40){badge.className='ibadge FE';badge.textContent='Fear';}
+  else if(v<=55){badge.className='ibadge NE';badge.textContent='Neutral';}
+  else if(v<=75){badge.className='ibadge GE';badge.textContent='Greed';}
+  else{badge.className='ibadge EG';badge.textContent='Extreme Greed';}
+  const tile=$('fgTile');
+  tile.className='itile '+(v<=30?'pulse-r':v>=65?'pulse-g':'');
+}
+
+function renderBTC(){
+  const p=S.btcPrice,c=S.btcChange1d;
+  $('btcVal').textContent='$'+Math.round(p).toLocaleString('de-DE');
+  const chEl=$('btcChg');
+  chEl.textContent=`${c>=0?'+':''}${c.toFixed(1)}% 24h`;
+  chEl.style.color=c>=2?'var(--gr)':c<=-2?'var(--re)':'var(--mu)';
+  const b=$('btcBadge'); b.style.display='inline-block';
+  if(Math.abs(c)>=12){b.className='ibadge '+(c>0?'EG':'EF');b.textContent=c>0?'Explosiv':'Crash';}
+  else if(c>=4){b.className='ibadge GE';b.textContent='Bullish';}
+  else if(c<=-4){b.className='ibadge FE';b.textContent='Bearish';}
+  else{b.className='ibadge NE';b.textContent='Neutral';}
+}
+
+function computeTrend(){
+  const fg=S.fg, c1=S.btcChange1d, c7=S.btcChange7d;
+  // Weighted score: F&G (50%) + 24h (30%) + 7d (20%)
+  let score=0;
+  // F&G
+  if(fg<=15) score-=3;
+  else if(fg<=30) score-=2;
+  else if(fg<=45) score-=1;
+  else if(fg>=80) score+=3;
+  else if(fg>=65) score+=2;
+  else if(fg>=55) score+=1;
+  // 24h
+  if(c1<=-10) score-=3;
+  else if(c1<=-4) score-=1.5;
+  else if(c1>=15) score+=3;
+  else if(c1>=6) score+=1.5;
+  else if(c1>=3) score+=0.5;
+  // 7d
+  if(c7<=-20) score-=2;
+  else if(c7<=-8) score-=1;
+  else if(c7>=30) score+=2.5;
+  else if(c7>=12) score+=1;
+
+  let trend;
+  if(score<=-3) trend='bearish';
+  else if(score<=-1) trend='bearish';
+  else if(score>=4) trend='explosive';
+  else if(score>=2) trend='bullish';
+  else trend='neutral';
+  S.trendAuto=trend;
+
+  const names={bearish:'📉 Bearish',neutral:'➡️ Neutral',bullish:'📈 Bullish',explosive:'🚀 Explosiv'};
+  const cols={bearish:'g',neutral:'b',bullish:'y',explosive:'r'};
+  const descs={
+    bearish:`F&G ${fg} · 24h ${c1.toFixed(1)}% · 7d ${c7.toFixed(1)}%`,
+    neutral:`F&G ${fg} · ${c1>=0?'+':''}${c1.toFixed(1)}% 24h · Seitwärts`,
+    bullish:`F&G ${fg} · +${c1.toFixed(1)}% 24h · Momentum↑`,
+    explosive:`F&G ${fg} · +${c1.toFixed(1)}% 24h · 🔥 FOMO`,
+  };
+  const tv=$('trendVal');
+  tv.textContent=names[trend]; tv.className='it-val '+cols[trend];
+  $('trendSub').textContent=descs[trend];
+  $('lastUpd').textContent=`Zuletzt aktualisiert: ${new Date().toLocaleTimeString('de-DE')}`;
+
+  renderAccounts();
+  updateUI();
+  addLog(`Live-Daten: F&G ${fg} | BTC $${Math.round(S.btcPrice).toLocaleString('de-DE')} (${c1>=0?'+':''}${c1.toFixed(1)}%) | Trend: ${trend.toUpperCase()}`,'g');
+}
+
+// ══════════════════════════════════════════
+// X-ACCOUNT SYNTHESIS
+// ══════════════════════════════════════════
+function getEffTrend(){return S.btcOverride!=='auto'?S.btcOverride:S.trendAuto;}
+
+function renderAccounts(){
+  const fg=S.fg, c1=S.btcChange1d, c7=S.btcChange7d, trend=getEffTrend();
+  const btcK='$'+Math.round(S.btcPrice).toLocaleString('de-DE');
+  const ath=126080, drawdown=Math.round((1-S.btcPrice/ath)*100);
+  const isBottomZone=fg<=25;
+  const isBounce=c1>=5 && fg<=40;
+  const isGreed=fg>=65;
+
+  const accounts=[
+    {
+      ico:'🏛️', name:'Michael Saylor / Strategy',
+      handle:'@saylor — MicroStrategy.com',
+      sig: 'accum', sigTxt:'Permanent Bull',
+      txt:`<b>Strategie:</b> Saylor kauft BTC unabhängig vom Preis. Keine kurzfristigen Signale — reiner Akkumulator. Bei F&G ${fg}: <b class="${isBottomZone?'gg':'og'}">historisch kauft Strategy in Extreme-Fear-Phasen am aggressivsten</b>. MSTR ist jetzt ${drawdown}% unter ATH — ähnliche Levels wie bei früheren Saylor-Käufen. <b>Für Covered Calls: Strike ultrakonservativ halten</b>, denn Saylor-Ankündigungen können MSTR in Stunden +20% treiben.`,
+    },
+    {
+      ico:'📊', name:'Micro2Macro',
+      handle:'@micro2macro — Macro-zu-Micro Cycle-Analyse',
+      sig: trend==='bearish'?'s-bear':trend==='explosive'?'s-bull':'s-watch',
+      sigTxt: trend==='bearish'?'Bearish Macro':trend==='explosive'?'Bullish':'Akkumulationszone',
+      txt:`<b>Macro-Cycle-Analyse:</b> BTC ${drawdown}% unter ATH bei $${Math.round(S.btcPrice).toLocaleString()}. ${isBottomZone?`<b class="gg">F&G ${fg} — historisch stärkste Akkumulationszone des Zyklus.</b> Micro2Macro: "Wer in Extreme-Fear verkauft, verkauft an Wale." Whale-Akkumulation: 270K BTC in 30 Tagen bestätigt.`:`F&G ${fg}: ${isBounce?'<b class="yg">Short-Squeeze-Bounce — kein echtes Reversal bestätigt.</b> Noch kein All-Clear-Signal.':'Konsolidierungsphase. Kein klarer Trend.'}`} <b>Für Covered Calls: ${isBottomZone?'Delta 0.06–0.08 — Rebound-Risiko maximal':'Konservativ bleiben — $72K Widerstand entscheidend'}</b>.`,
+    },
+    {
+      ico:'⚡', name:'Killa / KillaCycles',
+      handle:'@killacycles — On-Chain + Cycle-Timing',
+      sig: fg<=30?'s-accum':fg>=60?'s-bull':'s-watch',
+      sigTxt: fg<=30?'On-Chain: Akkumulieren':fg>=60?'Bullish':'Abwarten',
+      txt:`<b>On-Chain & Cycles:</b> ${fg<=25?`<b class="gg">F&G ${fg} = historisch tiefste Akkumulationszone seit FTX.</b> Killa's Ansatz: Cycle-Bottom-Signale aktiv. RSI auf 14-Tage-Basis: 25.6 — zweimal in BTC-Geschichte. <b>Für Covered Calls: Delta 0.05–0.06.</b> V-Reversal wie 2020/COVID möglich — in Tagen, nicht Wochen.`:fg<=40?`Fear ${fg}: Capitulation läuft. "Patience, stack sats." <b>Noch kein grünes Licht für aggressivere Strikes.</b>`:isGreed?`Greed ${fg}: Killa wird vorsichtig — Tops entstehen in Greed-Phasen. <b>Delta NICHT erhöhen.</b>`:`Neutral ${fg}: Warten auf klares Signal. Seitwärts = kein Handlungsbedarf.`}`,
+    },
+    {
+      ico:'🎯', name:'Michaël van de Poppe',
+      handle:'@MvdP — Analyst · CoinMamba',
+      sig: isBottomZone?'s-bull':isBounce?'s-watch':'s-neut',
+      sigTxt: isBottomZone?'Bottom-Signal aktiv':isBounce?'Bounce beobachten':'Neutral',
+      txt:`<b>Van de Poppe — technische Analyse:</b> ${isBottomZone?`<b class="gg">F&G 5 war das tiefste Level in BTC-Geschichte — tiefer als FTX, COVID, Mt. Gox.</b> MvdP: "Solche Level markieren historisch Monate-lang gültige Böden." BTC bounced heute +${c1.toFixed(1)}% auf $${Math.round(S.btcPrice).toLocaleString()} — erstes Zeichen. <b>Für Covered Calls: Kein Risiko eingehen — Trend-Umkehr kann schnell und brutal sein.</b>`:`MvdP-Analyse: $72K als kritischer Widerstand. Break darüber = $80K+ möglich. Failure = Retest $65K. <b>Für MSTR Covered Calls: Roll-Alarm bei $${S.price?(S.strike?(S.strike*0.94).toFixed(0):'—'):'—'} setzen.</b>`}`,
+    },
+    {
+      ico:'🧠', name:'Brain-Synthese',
+      handle:'MSTR Brain — eigene Einschätzung · heute '+new Date().toLocaleDateString('de-DE'),
+      sig: trend==='explosive'?'s-bull':trend==='bearish'?'s-bear':isBottomZone?'s-accum':'s-neut',
+      sigTxt:'Brain-Urteil heute',
+      txt:`<b>Lage ${new Date().toLocaleDateString('de-DE',{day:'numeric',month:'long',year:'numeric'})}:</b><br>
+• BTC: <span class="og">$${Math.round(S.btcPrice).toLocaleString()}</span> (${c1>=0?'+':''}${c1.toFixed(1)}%/24h, ${c7>=0?'+':''}${c7.toFixed(1)}%/7d) · ATH: -${drawdown}%<br>
+• F&G: <span class="${fg<=30?'rg':fg>=60?'gg':'yg'}">${fg} — ${S.fgLabel}</span><br>
+• Trend: <b>${trend.toUpperCase()}</b><br>
+• <span class="og">Empfohlenes Delta: ${computeDelta().delta}</span><br>
+• ${isBottomZone?'<span class="gg">Extreme Fear = potenzielle Bodenzone. Ultra-konservative Strikes. Kein Debit-Roll je.</span>':isBounce?'<span class="yg">Bounce läuft — Bestätigung fehlt. Vorsichtig bleiben.</span>':isGreed?'<span class="rg">Greed-Zone — Delta NICHT erhöhen trotz höherer Prämien!</span>':'<span class="bg">Konsolidierung. Bewährtë Strategie beibehalten.</span>'}`,
+    },
+  ];
+
+  // Overall signal
+  const bullish=accounts.filter(a=>a.sig==='s-bull'||a.sig==='s-accum').length;
+  const bearish=accounts.filter(a=>a.sig==='s-bear').length;
+  const ov=$('biOverall');
+  if(bearish>=3){ov.className='bi-overall FE';ov.textContent='Bearish';}
+  else if(bullish>=4){ov.className='bi-overall GE';ov.textContent='Bullish';}
+  else if(bullish>=3||isBottomZone){ov.className='bi-overall EG';ov.textContent='Akkumulieren';}
+  else{ov.className='bi-overall NE';ov.textContent='Neutral/Beobachten';}
+
+  $('accContent').innerHTML=accounts.map(a=>`
+    <div class="acc-row">
+      <div class="acc-ico">${a.ico}</div>
+      <div>
+        <div class="acc-name">${a.name}</div>
+        <div class="acc-handle">${a.handle}</div>
+        <div class="acc-txt">${a.txt}</div>
+        <span class="sig-pill ${a.sig}">${a.sigTxt}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════════
+// DELTA ENGINE
+// ══════════════════════════════════════════
+function computeDelta(){
+  const {iv,ivr,earnings}=S;
+  const fg=S.fg, c1=S.btcChange1d, c7=S.btcChange7d, trend=getEffTrend();
+  let d=0.10;
+  const facts=[], reasons=[];
+
+  // ── IV Level ──
+  if(iv>=150){d-=0.03;facts.push({l:'IV',v:`${iv}%`,c:'g',s:'Sehr hoch → tiefer Δ'});reasons.push({i:'📈',t:`<b>IV ${iv}%</b> — extrem hoch. Prämien üppig. Tiefes Delta lohnt sich sehr.`});}
+  else if(iv>=100){d-=0.015;facts.push({l:'IV',v:`${iv}%`,c:'g',s:'Hoch → etwas tiefer'});reasons.push({i:'📊',t:`<b>IV ${iv}%</b> — gut. Mehr Puffer möglich ohne Prämieneinbusse.`});}
+  else if(iv>=65){facts.push({l:'IV',v:`${iv}%`,c:'y',s:'Mittel → Baseline'});reasons.push({i:'📊',t:`<b>IV ${iv}%</b> — mittlere Vola. Baseline-Delta.`});}
+  else{d+=0.02;facts.push({l:'IV',v:`${iv}%`,c:'r',s:'Niedrig → Δ höher nötig'});reasons.push({i:'⚠️',t:`<b>IV ${iv}%</b> — niedrig für MSTR. Prämien dünn → höheres Delta.`});}
+
+  // ── IV Rank ──
+  if(ivr>=70){d-=0.01;facts.push({l:'IV Rank',v:`${ivr}`,c:'g',s:'Hoch → Prämien teuer'});reasons.push({i:'💰',t:`<b>IV Rank ${ivr}</b> — Optionen relativ teuer. Tiefes Delta rentabel.`});}
+  else if(ivr<=30){d+=0.015;facts.push({l:'IV Rank',v:`${ivr}`,c:'r',s:'Niedrig → Prämien billig'});reasons.push({i:'💤',t:`<b>IV Rank ${ivr}</b> — Optionen günstig. Höheres Delta für Ertrag.`});}
+  else{facts.push({l:'IV Rank',v:`${ivr}`,c:'y',s:'Mittel → neutral'});}
+
+  // ── Fear & Greed — Hauptfaktor ──
+  if(fg<=15){
+    d-=0.03;
+    facts.push({l:'F&G Index',v:`${fg} 😱`,c:'r',s:'Hist. Tiefstwert → −0.03'});
+    reasons.push({i:'🚨',t:`<b>F&G ${fg} — historischer Extremwert!</b> Tiefer als FTX-Crash (12), COVID (9). In JEDER bisherigen Extremangst-Phase folgte in 30–90 Tagen ein massiver Anstieg. MSTR kann in Tagen +30–50% machen. Delta drastisch reduziert.`});
+  }else if(fg<=25){
+    d-=0.025;
+    facts.push({l:'F&G Index',v:`${fg} 😨`,c:'r',s:'Extreme Fear → −0.025'});
+    reasons.push({i:'😨',t:`<b>F&G ${fg} (Extreme Fear)</b> — Wale akkumulieren (270K BTC/30T). Rebound-Risiko sehr hoch. Delta stark reduziert.`});
+  }else if(fg<=40){
+    d-=0.015;
+    facts.push({l:'F&G Index',v:`${fg} 😰`,c:'y',s:'Fear → −0.015'});
+    reasons.push({i:'😰',t:`<b>F&G ${fg} (Fear)</b> — Angst dominiert aber kein historischer Extremwert. Etwas konservativer.`});
+  }else if(fg>=75){
+    d+=0.008;
+    d=Math.min(d,0.10); // Sicherheitscap
+    facts.push({l:'F&G Index',v:`${fg} 🤑`,c:'o',s:'Greed → Delta-Cap 0.10'});
+    reasons.push({i:'🤑',t:`<b>F&G ${fg} (Greed/Extreme Greed)</b> — FOMO aktiv. Delta NICHT weiter erhöhen — Tops entstehen hier. Hard Cap: 0.10.`});
+  }else{
+    facts.push({l:'F&G Index',v:`${fg} 😐`,c:'b',s:'Neutral → kein Einfluss'});
+  }
+
+  // ── BTC 24h Move ──
+  if(c1<=-8){d-=0.01;facts.push({l:'BTC 24h',v:`${c1.toFixed(1)}%`,c:'r',s:'Crash → vorsichtig'});reasons.push({i:'📉',t:`<b>BTC ${c1.toFixed(1)}% in 24h</b> — starker Einbruch. Dead-Cat-Bounce möglich → vorsichtig.`});}
+  else if(c1>=10){d-=0.015;facts.push({l:'BTC 24h',v:`+${c1.toFixed(1)}%`,c:'y',s:'Starker Bounce → Risiko'});reasons.push({i:'⚡',t:`<b>BTC +${c1.toFixed(1)}% in 24h</b> — starker Anstieg. MSTR folgt mit Hebel. Strike schützen.`});}
+  else{facts.push({l:'BTC 24h',v:`${c1>=0?'+':''}${c1.toFixed(1)}%`,c:'b',s:'Normal → kein Einfluss'});}
+
+  // ── Trend ──
+  if(trend==='explosive'){d-=0.04;facts.push({l:'BTC Trend',v:'🚀 EXPLOSIV',c:'r',s:'Bullrun-Schutz −0.04'});reasons.push({i:'🚀',t:`<b>Explosiver BTC-Move</b> — MSTR 2–3× Hebel. Delta drastisch reduziert. Nur für Kredit rollen.`});}
+  else if(trend==='bullish'){d-=0.02;facts.push({l:'BTC Trend',v:'📈 Bullish',c:'y',s:'Aufwärtsdruck −0.02'});reasons.push({i:'📈',t:`<b>BTC bullish</b> — erhöhter Aufwärtsdruck auf MSTR.`});}
+  else if(trend==='bearish'){d+=0.01;facts.push({l:'BTC Trend',v:'📉 Bearish',c:'g',s:'Weniger Upside +0.01'});reasons.push({i:'📉',t:`<b>BTC bearish</b> — weniger Aufwärtsrisiko. Marginal mehr Delta vertretbar.`});}
+  else{facts.push({l:'BTC Trend',v:'➡️ Neutral',c:'b',s:'Kein Einfluss'});}
+
+  // ── Earnings ──
+  if(earnings){d-=0.03;facts.push({l:'Earnings',v:'⚠️ <14 TAGE',c:'r',s:'Kein Trade! −0.03'});reasons.push({i:'🚨',t:`<b>Earnings in &lt;14 Tagen!</b> MSTR ±30% möglich. Kein neuer Call bis nach Earnings.`});}
+  else{facts.push({l:'Earnings',v:'✓ Fern',c:'g',s:'Kein Einfluss'});}
+
+  d=Math.max(0.05,Math.min(0.12,parseFloat(d.toFixed(2))));
+  return{delta:d,facts,reasons};
+}
+
+// ══════════════════════════════════════════
+// OPTION MATH
+// ══════════════════════════════════════════
+function estPrem(price,strike,dte,iv){
+  if(!price||!strike||!dte||dte<=0)return 0;
+  const v=(iv||88)/100,t=dte/365;
+  return Math.max(0.05,price*v*Math.sqrt(t)*0.4*Math.exp(-2.8*Math.max(0,strike/price-1)));
+}
+
+function strikeFromDelta(price,delta,dte,iv){
+  if(!price)return null;
+  const v=(iv||88)/100,t=dte/365;
+  function normInv(p){
+    const a=[-3.969683028665376e1,2.209460984245205e2,-2.759285104469687e2,1.383577518672690e2,-3.066479806614716e1,2.506628277459239];
+    const b=[-5.447609879822406e1,1.615858368580409e2,-1.556989798598866e2,6.680131188771972e1,-1.328068155288572e1];
+    const c=[-7.784894002430293e-3,-3.223964580411365e-1,-2.400758277161838,-2.549732539343734,4.374664141464968,2.938163982698783];
+    const d=[ 7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996, 3.754408661907416];
+    const pL=0.02425,pH=1-pL;let x;
+    if(p<pL){const q=Math.sqrt(-2*Math.log(p));x=(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+    else if(p<=pH){const q=p-0.5,r=q*q;x=(((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);}
+    else{const q=Math.sqrt(-2*Math.log(1-p));x=-(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+    return x;
+  }
+  return Math.round(price*Math.exp(-normInv(delta)*v*Math.sqrt(t)+0.5*v*v*t)/5)*5;
+}
+
+// ══════════════════════════════════════════
+// STATUS LOGIC
+// ══════════════════════════════════════════
+function computeStatus(){
+  const{price,strike,premium,expiry,earnings,noPos,iv}=S;
+  const now=new Date(),{delta}=computeDelta(),nextMon=getNextMon(now);
+
+  if(noPos||!strike){
+    const dte=42,rs=price?strikeFromDelta(price,delta,dte,iv):null;
+    const rp=price&&rs?estPrem(price,rs,dte,iv):0;
+    const deltas=[0.05,0.06,0.07,0.08,0.09,0.10,0.11,0.12];
+    const hasRealData=S.optChain&&S.optChain.length>0&&S.optChain.some(r=>r.mid!=null);
+    const chainExp=S.chainExp?new Date(S.chainExp).toLocaleDateString('de-DE',{day:'numeric',month:'short',year:'numeric'}):'~42 Tage';
+    const dtable=price?deltas.map(d2=>{
+      const realS=getRealStrike(d2); const realP=getRealPrem(d2);
+      const s2=realS||strikeFromDelta(price,d2,42,iv);
+      const p2=realP!=null?realP:estPrem(price,s2,42,iv);
+      const isReal=realP!=null; const isRec=d2===delta;
+      return`<tr class="${isRec?'brain-rec':''}">
+        <td class="dt-delta">Δ${d2.toFixed(2)}</td>
+        <td class="dt-strike">$${s2}</td>
+        <td class="dt-prem" title="${isReal?'Echter Marktpreis (Mid)':'Black-Scholes Schätzung'}">${isReal?'':'≈'}$${p2.toFixed(2)}</td>
+        <td class="dt-total">${isReal?'':'≈'}$${Math.round(p2*200)}</td>
+        <td class="dt-rec">${isRec?'◀ Brain':''}</td>
+      </tr>`;
+    }).join(''):''; 
+    return{cls:'ac-open',badge:'ab-g',bt:'Heute eröffnen',
+      em:'🟢',title:'CALL VERKAUFEN',
+      body:`<span class="gg">Heute, ${fmtDate(now)}</span>. Kurs: <span class="og">${price?'$'+price.toFixed(2):'?'}</span>`,
+      steps:[`Delta: <span class="gg">${delta}</span> → Strike <span class="og">$${rs||'—'}</span>`,
+        `Laufzeit: <span class="gg">42 Tage</span> → Expiry ca. ${price?fmtDate(addDays(now,42)):'—'}`,
+        `Erwartete Prämie: <span class="gg">~$${rp.toFixed(2)}/Aktie</span> = ~$${Math.round(rp*200)} gesamt (2 Kontrakte)`,
+        price?`<div style="margin-top:14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.1em;font-weight:700;">🎯 Delta-Auswahl — Prämien pro Kontrakt</div>
+          <div style="font-size:10px;padding:2px 8px;border-radius:4px;font-weight:700;${hasRealData?'background:rgba(0,163,114,.12);color:var(--gr)':'background:rgba(0,0,0,.06);color:var(--mu)'}">
+            ${hasRealData?'✅ Echte Preise · Expiry '+chainExp:'≈ Schätzung · Optionskette eintragen ↓'}
+          </div>
+        </div>
+        <table class="delta-table"><thead><tr><th>Delta</th><th>Strike</th><th>Prämie/Aktie</th><th>2 Kontrakte</th><th></th></tr></thead><tbody>${dtable}</tbody></table>`:'<span style="color:var(--mu);font-size:11px;">Kurs eingeben → Delta-Tabelle erscheint</span>',
+        `<span class="og">2 Kontrakte</span> (200 Aktien) — nur <span class="gg">Limit-Order!</span>`,
+        `Roll-Alarm: wenn Call-Delta auf <span class="yg">0.25</span> steigt → dann rollen auf Strike <span class="og">$${price&&rs?Math.round(strikeFromDelta(price,delta,42,iv)):'—'}</span>, Delta <span class="gg">${delta}</span>, <span class="gg">42 Tage</span> Laufzeit — nur für Kredit!`]};
+  }
+  if(!price)return{cls:'ac-idle',badge:'ab-b',bt:'Warten',em:'📊',title:'KURS EINGEBEN',
+    body:`Strike <span class="og">$${strike}</span> gespeichert. Bitte Kurs eingeben.`,steps:[]};
+
+  const buf=((strike-price)/price*100);
+  const dte=expiry?Math.max(0,Math.ceil((new Date(expiry)-now)/86400000)):null;
+
+  if(earnings)return{cls:'ac-danger',badge:'ab-r',bt:'🚨 EARNINGS!',em:'🚨',title:'CALL SCHLIESSEN',
+    body:`<span class="rg">Earnings in &lt;14 Tagen!</span> Sofort schließen — MSTR ±30% möglich.`,
+    steps:[`Broker öffnen`,`<span class="rg">Buy-to-Close</span>: Call $${strike} — Limit-Order`,`Auf Earnings-Ergebnis warten`,`Danach neu planen`]};
+
+  if(dte!==null&&dte<=7&&buf<10)return{cls:'ac-danger',badge:'ab-r',bt:'GAMMA ALARM',em:'🔥',title:'SOFORT ROLLEN',
+    body:`<span class="rg">Nur ${dte} DTE</span> und ${buf.toFixed(1)}% Puffer. Gamma explodiert. <span class="rg">Max. 1 Stunde!</span>`,
+    steps:[`<span class="rg">Buy-to-Close</span>: Call $${strike}`,
+      `<span class="gg">Sell-to-Open</span>: $${price?strikeFromDelta(price,delta,42,iv):'—'}, Delta ${delta}, 42 Tage`,
+      `Nur wenn Prämie ≥ Buyback — kein Debit!`]};
+
+  if(buf<6){const ns=price?strikeFromDelta(price,delta,42,iv):'—';
+    return{cls:'ac-roll',badge:'ab-y',bt:'⚡ ROLLEN JETZT',em:'⚡',title:'JETZT ROLLEN',
+      body:`Kurs <span class="rg">$${price.toFixed(2)}</span> — nur <span class="rg">${buf.toFixed(1)}%</span> Puffer. <span class="yg">Ca. 1 Stunde.</span>`,
+      steps:[`<span class="rg">Buy-to-Close</span>: Call $${strike}`,
+        `<span class="gg">Sell-to-Open</span>: <span class="og">$${ns}</span>, Delta ${delta}, 42 Tage`,
+        `<span class="yg">NUR</span> wenn neue Prämie ≥ Buyback — NIE Debit!`,
+        `Falls kein Kredit: Laufzeit auf 60 Tage verlängern`]};}
+
+  if(buf<12)return{cls:'ac-warn',badge:'ab-y',bt:'⚠️ Beobachten',em:'⚠️',title:'STRIKE NÄHERT SICH',
+    body:`<span class="og">$${price.toFixed(2)}</span> — <span class="yg">${buf.toFixed(1)}%</span> Puffer. Stündlich prüfen.`,
+    steps:[`Alarm bei <span class="yg">$${(strike*.97).toFixed(0)}</span> im Broker setzen`,`Broker-App bereithalten`]};
+
+  if(premium){
+    const ce=estPrem(price,strike,dte||21,iv);
+    if(ce<=premium*0.25)return{cls:'ac-open',badge:'ab-g',bt:'💰 Gewinnmitnahme',em:'💰',title:'BUY-TO-CLOSE JETZT',
+      body:`Call hat <span class="gg">75%+ Zeitwert</span> verloren. Schließen + sofort neuen Zyklus starten.`,
+      steps:[`<span class="gg">Buy-to-Close</span>: ~$${ce.toFixed(2)}/Aktie → Gewinn ~$${Math.round((premium-ce)*200)}`,
+        `Sofort neuen Call: $${strikeFromDelta(price,delta,42,iv)}, Delta ${delta}, 42 Tage`]};}
+
+  return{cls:'ac-safe',badge:'ab-g',bt:'✅ Sicher',em:'✅',title:'POSITION SICHER',
+    body:`Strike <span class="og">$${strike}</span> — <span class="gg">${buf.toFixed(1)}%</span> Puffer bei $${price.toFixed(2)}.${dte?` <span class="bg">${dte} DTE.</span>`:''} <span class="gg">Nichts tun.</span>`,
+    steps:[`Roll-Alarm setzen bei: $${(strike*.94).toFixed(0)}`,
+      `25%-Ziel: ${premium?'$'+(premium*.25).toFixed(2)+'/Aktie':'Prämie in Einstellungen eintragen'}`,
+      `Nächste Prüfung: beim nächsten App-Öffnen`]};
+}
+
+// ══════════════════════════════════════════
+// SCENARIOS
+// ══════════════════════════════════════════
+let activeSc='d';
+function selSc(id){
+  activeSc=id;
+  document.querySelectorAll('.sct').forEach(t=>t.classList.remove('act'));
+  document.querySelector('.sct.t'+id).classList.add('act');
+  document.querySelectorAll('.sc-panel').forEach(p=>p.classList.remove('act'));
+  $('sc-'+id).classList.add('act');
+  renderSc();
+}
+
+function renderSc(){
+  const{price:p0,strike:sk,premium:pr,expiry,iv}=S;
+  const p=p0||146;
+  const dte=expiry?Math.max(1,Math.ceil((new Date(expiry)-new Date())/86400000)):35;
+  const{delta}=computeDelta();
+  const defs={
+    d:{ico:'📉',lbl:'Kurs sinkt −10%',np:p*.90,vc:'vg'},
+    f:{ico:'➡️',lbl:'Kurs stabil ~0%', np:p*1.01,vc:'vb'},
+    u:{ico:'📈',lbl:'Kurs +7.5%',      np:p*1.075,vc:'vy'},
+    m:{ico:'🚀',lbl:'Kurs +22%',       np:p*1.22, vc:'vr'},
+  };
+  Object.entries(defs).forEach(([key,sc])=>{
+    const el=$('sc-'+key);
+    const np=sc.np;
+    const bufN=sk?((sk-np)/np*100):null;
+    const pN=sk?estPrem(p,sk,dte,iv):null;
+    const pNew=sk?estPrem(np,sk,Math.max(1,dte-7),iv):null;
+    const c25=pr&&pNew&&pNew<=pr*.25;
+    const ns=strikeFromDelta(np,delta,42,iv);
+    const rp=ns?estPrem(np,ns,42,iv):0;
+    const rd=pNew?(rp-pNew):0;
+    const theta=pN&&dte?((pN*200)/dte).toFixed(0):'—';
+    let verd='',acts=[],mets=[];
+
+    if(key==='d'){
+      verd=`<b style="color:var(--gr)">Beste Situation.</b> Kurs fällt → Call verliert schnell Wert. Aktien absolut sicher. Theta + Delta arbeiten automatisch für dich.`;
+      mets=[
+        {l:'Neuer Kurs',v:`$${np.toFixed(0)}`,c:'g',s:'−10%'},
+        {l:'Puffer zum Strike',v:bufN?`${bufN.toFixed(1)}%`:'—',c:'g',s:'Sehr sicher'},
+        {l:'Prämie sinkt auf',v:pNew?`~$${pNew.toFixed(2)}`:'—',c:'g',s:'Günstiger Rückkauf'},
+        {l:'25%-Ziel erreicht?',v:c25?'JA ✓':'Bald',c:c25?'g':'y',s:pr?`≤$${(pr*.25).toFixed(2)}/Aktie`:'Prämie eintragen'},
+      ];
+      acts=[`<b>Nichts tun</b> — warte auf 25%-Ziel: ≤$${pr?(pr*.25).toFixed(2):'—'}/Aktie`,
+        `Gewinn bei Rückkauf: ~$${pr&&pNew?Math.round((pr-pNew)*200):'—'} auf beide Kontrakte`,
+        `Danach sofort neuen Zyklus starten — bei Kursrückgang steigt IV → bessere nächste Prämie`,
+        `Context: Bei F&G ${S.fg} akkumulieren Wale — MSTR könnte schnell drehen`];
+    }
+    if(key==='f'){
+      verd=`<b style="color:var(--bl)">Idealfall.</b> Theta-Verfall arbeitet täglich. ~$${theta}/Tag auf beide Kontrakte. Kein Handlungsbedarf.`;
+      mets=[
+        {l:'Neuer Kurs',v:`$${np.toFixed(0)}`,c:'b',s:'~0%'},
+        {l:'Puffer',v:bufN?`${bufN.toFixed(1)}%`:'—',c:'b',s:'Sicher'},
+        {l:'Täglicher Theta-Gewinn',v:`~$${theta}`,c:'g',s:'2 Kontrakte total'},
+        {l:'Prämie nach 1 Woche',v:pNew?`~$${pNew.toFixed(2)}`:'—',c:'b',s:'Zeitverfall'},
+      ];
+      acts=[`<b>Nichts tun</b> — Theta verdient täglich automatisch`,
+        `25%-Ziel abwarten: ≤$${pr?(pr*.25).toFixed(2):'—'}/Aktie → dann rückkaufen`,
+        `Nach Rückkauf: neuer Call $${ns||'—'}, Delta ${delta}, 42 Tage`,
+        `Jahresrendite bei stabil: ~${pr?((pr*200*9/(p*200)*100).toFixed(1)):'12–15'}%`];
+    }
+    if(key==='u'){
+      const warn=bufN!==null&&bufN<12;
+      verd=`<b style="color:var(--ye)">${warn?'Aufmerksamkeit nötig.':'Noch im grünen Bereich.'}</b> Call wird teurer. ${warn?`<span style="color:var(--re)">Puffer unter 12%!</span>`:'Noch ausreichend Abstand.'}`;
+      mets=[
+        {l:'Neuer Kurs',v:`$${np.toFixed(0)}`,c:'y',s:'+7.5%'},
+        {l:'Puffer',v:bufN?`${bufN.toFixed(1)}%`:'—',c:warn?'r':'y',s:warn?'⚠ Beobachten!':'Ok'},
+        {l:'Mehrkosten Buyback',v:pN&&pNew?`~$${((pNew-pN)*200).toFixed(0)}`:'—',c:'r',s:'Falls jetzt schließen'},
+        {l:'Roll-Kredit?',v:rd>=0?'JA ✓':'Laufzeit erhöhen',c:rd>=0?'g':'y',s:`Neuer Strike ~$${ns||'—'}`},
+      ];
+      acts=[warn?`Kursalarm bei <b>$${sk?(sk*.97).toFixed(0):'—'}</b> im Broker setzen`:`Weiter beobachten — kein Handlungsbedarf`,
+        `25%-Ziel: ${c25?`<b>JA! Rückkauf bei ~$${pNew?pNew.toFixed(2):'—'}/Aktie</b>`:`Noch nicht — ~$${pNew?pNew.toFixed(2):'—'}/Aktie`}`,
+        `Roll: Strike $${ns||'—'}, ${rd>=0?'<b>Kredit-Roll ✓</b>':'Laufzeit auf 55–60 Tage'}`,
+        `Erst rollen wenn Call-Delta 0.25 erreicht — nicht früher`];
+    }
+    if(key==='m'){
+      const must=bufN!==null&&bufN<6;
+      verd=`<b style="color:var(--re)">${must?'SOFORT HANDELN!':'Vorbereiten!'}</b> Starker Anstieg. Call sehr teuer. ${must?'Puffer fast weg — Roll jetzt!':'Roll-Alarm aktivieren.'}`;
+      mets=[
+        {l:'Neuer Kurs',v:`$${np.toFixed(0)}`,c:'r',s:'+22%'},
+        {l:'Puffer',v:bufN?`${bufN.toFixed(1)}%`:'—',c:must?'r':'y',s:must?'🚨 ROLLEN!':'⚠ Vorbereiten'},
+        {l:'Buyback-Kosten',v:pNew?`~$${(pNew*200).toFixed(0)}`:'—',c:'r',s:'Beide Kontrakte'},
+        {l:'Roll-Saldo',v:rd!==0?`${rd>=0?'+':''}$${(rd*200).toFixed(0)}`:'—',c:rd>=0?'g':'r',s:rd>=0?'Kredit ✓':'Laufzeit↑'},
+      ];
+      acts=[must?`<span style="color:var(--re)"><b>Buy-to-Close SOFORT: Call $${sk}</b> — Limit-Order!</span>`:`Kursalarm bei $${sk?(sk*.95).toFixed(0):'—'} setzen`,
+        `<b>Sell-to-Open: $${ns||'—'}</b>, Delta ${delta}, 42 Tage`,
+        rd>=0?`<b style="color:var(--gr)">Roll-Kredit: +$${(rd*200).toFixed(0)} ✓ — kein eigenes Geld</b>`:`Kein Kredit → <b>Laufzeit auf 60 Tage</b> bis Kredit gesichert`,
+        `Bei MSTR +40% in 3 Wochen: <b style="color:var(--re)">Alle Calls schließen</b> — Upside frei`,
+        `<b>Eiserne Regel: Nie für einen Roll bezahlen — NIE!</b>`];
+    }
+
+    el.innerHTML=`
+      <div class="sp-top">
+        <div class="sp-ico">${sc.ico}</div>
+        <div><h3>${sc.lbl}</h3><p>Basis: $${p.toFixed(0)}${sk?' · Strike $'+sk:''} · ${dte} DTE · Δ${delta}</p></div>
+      </div>
+      <div class="sp-mets">${mets.map(m=>`<div class="sm"><div class="sm-lbl">${m.l}</div><div class="sm-val ${m.c}">${m.v}</div><div class="sm-sub">${m.s}</div></div>`).join('')}</div>
+      <div class="sp-verd ${sc.vc}">${verd}</div>
+      <div class="sp-acts">${acts.map((a,i)=>`<div class="spa"><div class="san">${i+1}</div><div>${a}</div></div>`).join('')}</div>
+    `;
+  });
+}
+
+// ══════════════════════════════════════════
+// UPDATE ALL UI
+// ══════════════════════════════════════════
+function updateUI(){
+  const{price,strike,expiry,iv,ivr}=S;
+  const{delta,facts,reasons}=computeDelta();
+
+  // IV display
+  $('ivDisp').textContent=`${iv}%`;
+  $('ivrDisp').textContent=ivr;
+
+  // Delta track
+  const pct=(delta-.05)/.10*100;
+  const dEl=$('dBig');
+  dEl.textContent=delta.toFixed(2);
+  dEl.className='d-big '+(delta<=.07?'safe':delta<=.10?'mid':'hot');
+  $('dMode').textContent=delta<=.07?'Ultra-Safe — Bullrun-Schutz aktiv':delta<=.09?'Hermeslux-Zone — sehr konservativ':delta<=.11?'Konservativ':'Aktiv — erhöhte Prämien';
+  $('dPct').innerHTML=`<b>${(delta*100).toFixed(0)}%</b> Zuweisung-Wahrscheinlichkeit`;
+  $('dPin').style.left=Math.max(3,Math.min(97,pct))+'%';
+  $('dcSub').textContent=`F&G:${S.fg} · ${getEffTrend()} · IV:${iv}% · ${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}`;
+
+  $('dFactors').innerHTML=facts.map(f=>`
+    <div class="df"><div class="df-lbl">${f.l}</div><div class="df-val ${f.c}">${f.v}</div><div class="df-sub">${f.s}</div></div>
+  `).join('');
+
+  const rs=price?strikeFromDelta(price,delta,42,iv):null;
+  const rp=price&&rs?estPrem(price,rs,42,iv):0;
+  $('dReasoning').innerHTML=`
+    ${reasons.map(r=>`<div class="dr-item"><span>${r.i}</span><span>${r.t}</span></div>`).join('')}
+    <div class="dr-verdict">🎯 <span class="vo">Empfehlung:</span> Strike <span class="vo">$${rs||'—'}</span> (Δ${delta}, 42 DTE)${price?` → Prämie ~<span class="vg">$${rp.toFixed(2)}/Aktie</span> = ~<span class="vg">$${Math.round(rp*200)}</span> gesamt`:''}</div>
+  `;
+
+  // Action card
+  const st=computeStatus();
+  const ac=$('actionCard');
+  ac.className='action-card '+st.cls;
+  $('acEm').textContent=st.em;
+  const badge=$('acBadge'); badge.textContent=st.bt; badge.className='ac-badge '+st.badge;
+  $('acTitle').textContent=st.title;
+  $('acBody').innerHTML=st.body+(st.steps.length?`<div class="steps">${st.steps.map((s,i)=>`<div class="step"><div class="snum">${i+1}</div><div>${s}</div></div>`).join('')}</div>`:'');
+
+  // Gauges
+  if(strike){$('gStrike').textContent='$'+strike;$('gStrikeSub').textContent='Dein Strike';}
+  if(price&&strike){
+    const buf=((strike-price)/price*100);
+    const bEl=$('gBuf'); bEl.textContent=buf.toFixed(1)+'%';
+    bEl.className='g-val '+(buf<6?'r':buf<12?'y':'g');
+    $('gBufSub').textContent=buf<0?'⚠ ITM!':'Puffer zum Strike';
+    const p2=Math.min(price/strike*100,100);
+    $('pFill').style.width=p2+'%';
+    $('pFill').style.background=p2>94?'var(--re)':p2>86?'var(--ye)':'var(--gr)';
+    $('pPct').textContent=p2.toFixed(1)+'% zum Strike';
+    $('pL').textContent='$'+price.toFixed(0);
+    $('pR').textContent='Strike: $'+strike;
+  }
+  if(expiry){
+    const d=new Date(expiry),dte2=Math.max(0,Math.ceil((d-new Date())/86400000));
+    $('gExp').textContent=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+    const dEl=$('gDTE'); dEl.textContent=dte2>0?dte2:'EXP';
+    dEl.className='g-val '+(dte2<=7?'r':dte2<=14?'y':'g');
+  }
+
+  renderSc();
+  // Fire email alerts based on current status
+  checkAndFireAlerts(computeStatus());
+}
+
+// ══════════════════════════════════════════
+// CONTROLS
+// ══════════════════════════════════════════
+function applyPrice(){
+  const v=parseFloat($('mstrPrice').value);
+  if(v>0){S.price=v;saveStateLocal();addLog(`MSTR Kurs gesetzt: $${v.toFixed(2)}`,'g');updateUI();}
+}
+
+function saveSet(){
+  const newBase = $('iApiBase').value.trim().replace(/\/+$/, '');
+  if(newBase !== API_BASE){
+    API_BASE = newBase;
+    localStorage.setItem('mstr_api_base', API_BASE);
+    if(API_BASE) fetchAll(); // sofort laden wenn URL neu gesetzt
+  }
+  S.strike=parseFloat($('iStrike').value)||null;
+  S.premium=parseFloat($('iPrem').value)||null;
+  S.expiry=$('iExp').value||null;
+  S.iv=parseFloat($('iIV').value)||88;
+  S.ivr=parseFloat($('iIVR').value)||43;
+  S.btcOverride=$('iBTC').value;
+  S.earnings=$('iEarn').checked;
+  S.noPos=$('iNoPos').checked;
+  saveStateLocal();
+  if(setOpen)toggleSet();
+  addLog(`Gespeichert — Strike:$${S.strike||'—'} IV:${S.iv}% BTC:${S.btcOverride}`,'o');
+  updateUI();
+}
+
+let setOpen=false,biOpen=false;
+function toggleSet(){setOpen=!setOpen;$('setBody').classList.toggle('open',setOpen);$('setHdr').classList.toggle('open',setOpen);}
+function toggleBI(){biOpen=!biOpen;$('biBody').classList.toggle('open',biOpen);$('biHdr').classList.toggle('open',biOpen);}
+
+function addLog(txt,c='b'){
+  const e=document.createElement('div');
+  e.className='li';
+  e.innerHTML=`<div class="li-dot ${c}"></div><div><div class="li-txt">${txt}</div><div class="li-time">${new Date().toLocaleTimeString('de-DE')}</div></div>`;
+  const w=$('logItems'); w.insertBefore(e,w.firstChild);
+  while(w.children.length>10)w.removeChild(w.lastChild);
+}
+
+function getNextMon(d){const r=new Date(d),day=r.getDay();r.setDate(r.getDate()+(day===0?1:8-day));return r;}
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+function fmtDate(d){return d.toLocaleDateString('de-DE',{day:'numeric',month:'long'});}
+
+// ══════════════════════════════════════════
+// EMAIL ALERTS
+// ══════════════════════════════════════════
+const E = {
+  key:'', service:'', template:'', email:'',
+  roll:true, warn:true, danger:true, profit:false, fg:false,
+  lastSent:{},
+};
+
+function loadEmail(){
+  try{
+    const d=JSON.parse(localStorage.getItem('mstr_email_v1')||'{}');
+    ['key','service','template','email','roll','warn','danger','profit','fg'].forEach(k=>{if(d[k]!==undefined)E[k]=d[k];});
+    if(E.key) $('iEJKey').value=E.key;
+    if(E.service) $('iEJService').value=E.service;
+    if(E.template) $('iEJTemplate').value=E.template;
+    if(E.email) $('iEmail').value=E.email;
+    $('eRoll').checked=E.roll!==false;
+    $('eWarn').checked=E.warn!==false;
+    $('eDanger').checked=E.danger!==false;
+    $('eProfit').checked=E.profit===true;
+    $('eFG').checked=E.fg===true;
+  }catch(e){}
+}
+
+function saveEmail(){
+  E.key=$('iEJKey').value.trim();
+  E.service=$('iEJService').value.trim();
+  E.template=$('iEJTemplate').value.trim();
+  E.email=$('iEmail').value.trim();
+  E.roll=$('eRoll').checked;
+  E.warn=$('eWarn').checked;
+  E.danger=$('eDanger').checked;
+  E.profit=$('eProfit').checked;
+  E.fg=$('eFG').checked;
+  try{localStorage.setItem('mstr_email_v1',JSON.stringify(E));}catch(e){}
+  setEmailStatus('✅ Gespeichert!','var(--gr)');
+  addLog('📧 E-Mail Einstellungen gespeichert','g');
+}
+
+function setEmailStatus(msg,color){
+  const el=$('emailStatus');
+  if(el){el.textContent=msg;el.style.color=color||'var(--mu)';}
+}
+
+async function initEJ(){
+  if(typeof emailjs!=='undefined'){emailjs.init({publicKey:E.key});return true;}
+  return false;
+}
+
+async function sendAlert(type, subject, message){
+  if(!E.key||!E.service||!E.template||!E.email) return;
+  const now=Date.now();
+  if(E.lastSent[type] && now-E.lastSent[type] < 30*60*1000) return; // max 1x per 30min
+  E.lastSent[type]=now;
+  try{
+    await initEJ();
+    await emailjs.send(E.service, E.template, {to_email:E.email, subject:subject, message:message});
+    addLog('📧 Mail gesendet: '+subject,'g');
+  }catch(err){
+    addLog('📧 Mail-Fehler: '+(err.text||err.message||JSON.stringify(err)),'r');
+  }
+}
+
+async function testEmail(){
+  if(!E.key||!E.service||!E.template||!E.email){
+    setEmailStatus('⚠️ Bitte alle 4 Felder ausfüllen und zuerst speichern!','var(--ye)'); return;
+  }
+  setEmailStatus('⏳ Sende Test-Mail...','var(--mu)');
+  try{
+    await initEJ();
+    const{delta}=computeDelta();
+    await emailjs.send(E.service, E.template, {
+      to_email:E.email,
+      subject:'MSTR Brain Test-Alarm ✅',
+      message:'MSTR Brain v5 funktioniert korrekt!\n\nAktuelle Werte:\n'
+        +'• MSTR Kurs: $'+(S.price||'—')+'\n'
+        +'• BTC: $'+Math.round(S.btcPrice).toLocaleString('de-DE')+'\n'
+        +'• Fear & Greed: '+S.fg+' ('+S.fgLabel+')\n'
+        +'• BTC Trend: '+getEffTrend()+'\n'
+        +'• Empfohlenes Delta: '+delta+'\n'
+        +'• Dein Strike: $'+(S.strike||'—')+'\n\n'
+        +'Du wirst bei wichtigen Ereignissen automatisch benachrichtigt.',
+    });
+    setEmailStatus('✅ Test-Mail gesendet! Prüfe dein Postfach.','var(--gr)');
+    addLog('📧 Test-Mail gesendet an '+E.email,'g');
+  }catch(err){
+    setEmailStatus('❌ Fehler: '+(err.text||err.message||JSON.stringify(err)),'var(--re)');
+  }
+}
+
+let emailOpen=false;
+function toggleEmail(){emailOpen=!emailOpen;$('emailBody').classList.toggle('open',emailOpen);$('emailHdr').classList.toggle('open',emailOpen);}
+
+function checkAndFireAlerts(st){
+  if(!E.key||!E.service||!E.template||!E.email) return;
+  const{price,strike,iv}=S;
+  const{delta}=computeDelta();
+  const rollStrike=price?strikeFromDelta(price,delta,42,iv):'—';
+  const btcStr='$'+Math.round(S.btcPrice).toLocaleString('de-DE');
+
+  if(E.danger && st.cls==='ac-danger'){
+    sendAlert('danger','🚨 MSTR Brain: SOFORT HANDELN! — '+st.title,
+      st.title+'\n\n'+(st.body||'').replace(/<[^>]+>/g,'')+'\n\n'
+      +'MSTR Kurs: $'+(price||'—')+'\nDein Strike: $'+(strike||'—')+'\n'
+      +'F&G: '+S.fg+' | BTC: '+btcStr);
+  }
+  if(E.roll && st.cls==='ac-roll'){
+    sendAlert('roll','⚡ MSTR Brain: Jetzt ROLLEN — Strike $'+strike,
+      'Dein Call nähert sich dem Strike!\n\n'
+      +'MSTR Kurs: $'+price+'\nDein aktueller Strike: $'+strike+'\n\n'
+      +'>> Empfohlener Roll:\n'
+      +'   Neuer Strike: $'+rollStrike+'\n'
+      +'   Delta: '+delta+'\n'
+      +'   Laufzeit: 42 Tage\n'
+      +'   Regel: NUR für Kredit rollen — nie Debit zahlen!\n\n'
+      +'F&G: '+S.fg+' | BTC: '+btcStr);
+  }
+  if(E.warn && st.cls==='ac-warn'){
+    sendAlert('warn','⚠️ MSTR Brain: Strike nähert sich — Puffer unter 12%',
+      'Bitte beobachten — kein sofortiger Handlungsbedarf.\n\n'
+      +'MSTR Kurs: $'+price+'\nDein Strike: $'+strike+'\n\n'
+      +'Falls Roll nötig wird:\n'
+      +'   Neuer Strike: $'+rollStrike+' | Delta: '+delta+' | 42 Tage\n\n'
+      +'F&G: '+S.fg+' | BTC: '+btcStr);
+  }
+  if(E.profit && st.cls==='ac-open' && st.bt&&st.bt.includes('Gewinn')){
+    sendAlert('profit','💰 MSTR Brain: 25% Gewinnmitnahme erreicht!',
+      'Dein Call hat 75%+ des Zeitwerts verloren.\n\n'
+      +'Empfehlung:\n'
+      +'1. Buy-to-Close: aktueller Call\n'
+      +'2. Sofort neuen Call eröffnen:\n'
+      +'   Strike: $'+rollStrike+' | Delta: '+delta+' | 42 Tage\n\n'
+      +'MSTR: $'+price+' | F&G: '+S.fg);
+  }
+  if(E.fg){
+    const fg=S.fg;
+    if(fg<=15) sendAlert('fg_low','😱 MSTR Brain: Extreme Fear '+fg+' — Historischer Tiefstwert!',
+      'Fear & Greed Index: '+fg+' ('+S.fgLabel+')\n\n'
+      +'Das ist tiefer als FTX-Crash (12) und COVID (9).\n'
+      +'Historisch: Solche Level = Bodenzone. Rebound kann brutal sein.\n\n'
+      +'Empfohlenes Delta: '+delta+' (ultra-konservativ)\n'
+      +'BTC: '+btcStr);
+    else if(fg>=80) sendAlert('fg_high','🤑 MSTR Brain: Extreme Greed '+fg+' — FOMO aktiv!',
+      'Fear & Greed Index: '+fg+' ('+S.fgLabel+')\n\n'
+      +'WARNUNG: Tops entstehen in Greed-Phasen.\n'
+      +'Delta gedeckelt auf 0.10 — kein Risiko eingehen!\n'
+      +'BTC: '+btcStr);
+  }
+}
+
+
+// ══════════════════════════════════════════
+// MANUAL OPTIONS CHAIN
+// ══════════════════════════════════════════
+const DELTAS = [0.05,0.06,0.07,0.08,0.09,0.10,0.11,0.12];
+
+function renderChainInputs(){
+  const wrap = $('chainInputs');
+  if(!wrap) return;
+  // Show hint for target expiry (~42 DTE from today)
+  const hint = $('chainExpHint');
+  if(hint){
+    const t = new Date(); t.setDate(t.getDate()+42);
+    hint.textContent = t.toLocaleDateString('de-DE',{day:'numeric',month:'long',year:'numeric'});
+  }
+  // Load saved expiry
+  if(S.chainExp) { const ce=$('iChainExp'); if(ce) ce.value=S.chainExp; }
+
+  wrap.innerHTML = DELTAS.map(d=>{
+    const saved = S.optChain.find(r=>r.delta===d)||{};
+    return `<div style="display:grid;grid-template-columns:60px 1fr 80px 80px;gap:6px;align-items:center;margin-bottom:7px;">
+      <div style="font-family:var(--disp);font-size:1rem;color:var(--or);font-weight:700;">Δ${d.toFixed(2)}</div>
+      <input type="number" id="cs_${d.toFixed(2)}_strike" placeholder="z.B. 220" step="0.5" value="${saved.strike||''}"
+        style="background:rgba(0,0,0,.05);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-family:var(--mono);font-size:13px;color:var(--tx);outline:none;width:100%;">
+      <input type="number" id="cs_${d.toFixed(2)}_bid" placeholder="Bid" step="0.01" value="${saved.bid||''}"
+        style="background:rgba(0,0,0,.05);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-family:var(--mono);font-size:13px;color:var(--gr);outline:none;width:100%;">
+      <input type="number" id="cs_${d.toFixed(2)}_ask" placeholder="Ask" step="0.01" value="${saved.ask||''}"
+        style="background:rgba(0,0,0,.05);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-family:var(--mono);font-size:13px;color:var(--re);outline:none;width:100%;">
+    </div>`;
+  }).join('');
+}
+
+function saveChain(){
+  S.chainExp = $('iChainExp').value || null;
+  S.optChain = DELTAS.map(d=>{
+    const key = d.toFixed(2);
+    const strike = parseFloat($('cs_'+key+'_strike').value)||null;
+    const bid    = parseFloat($('cs_'+key+'_bid').value)||null;
+    const ask    = parseFloat($('cs_'+key+'_ask').value)||null;
+    const mid    = (bid!=null&&ask!=null) ? +((bid+ask)/2).toFixed(2) : null;
+    return {delta:d, strike, bid, ask, mid};
+  }).filter(r=>r.strike||r.bid||r.ask);
+  saveStateLocal();
+  const filled = S.optChain.filter(r=>r.mid!=null).length;
+  const el=$('chainStatus');
+  if(el){el.textContent=`✅ ${filled} von 8 Deltas gespeichert — App nutzt jetzt echte Prämien.`;el.style.color='var(--gr)';}
+  addLog(`📋 Optionskette gespeichert: ${filled}/8 Deltas mit echten Prämien`,'g');
+  if(chainOpen) toggleChain();
+  updateUI();
+}
+
+// Get real mid price for a given delta (or null if not available)
+function getRealPrem(delta){
+  if(!S.optChain||!S.optChain.length) return null;
+  const row = S.optChain.find(r=>r.delta===delta);
+  return (row && row.mid!=null) ? row.mid : null;
+}
+
+// Get real strike for a given delta (or null)
+function getRealStrike(delta){
+  if(!S.optChain||!S.optChain.length) return null;
+  const row = S.optChain.find(r=>r.delta===delta);
+  return (row && row.strike) ? row.strike : null;
+}
+
+let chainOpen=false;
+function toggleChain(){
+  chainOpen=!chainOpen;
+  $('chainBody').classList.toggle('open',chainOpen);
+  $('chainHdr').classList.toggle('open',chainOpen);
+}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+$('t0').textContent=new Date().toLocaleTimeString('de-DE');
+loadState();
+renderChainInputs();
+loadEmail();
+if(!S.strike&&!S.noPos)toggleSet();
+
+// Render with saved/default data first
+updateUI();
+
+// Load live data
+fetchAll().catch(()=>updateUI());
+
+// ══ SMART US MARKET REFRESH ══
+// NYSE/NASDAQ Regular: 15:30–22:00 UTC = Mon-Fri 9:30–16:00 ET
+// Pre-market: 13:00–15:30 UTC → also 5min
+// Off-hours/weekend: 10min (BTC/FG still move)
+let _refreshTimer=null, _cdSec=0, _cdInterval=null;
+
+function getMktState(){
+  const now=new Date(), day=now.getUTCDay();
+  const mins=now.getUTCHours()*60+now.getUTCMinutes();
+  if(day===0||day===6) return{state:'weekend',ms:10*60*1000};
+  if(mins>=15*60+30&&mins<22*60) return{state:'regular',ms:5*60*1000};
+  if(mins>=13*60&&mins<15*60+30) return{state:'premarket',ms:5*60*1000};
+  return{state:'closed',ms:10*60*1000};
+}
+
+function updateMktStatusBar(){
+  const{state}=getMktState();
+  const dot=$('mktDot'),st=$('mktStatus'),nx=$('mktNext');
+  if(!dot) return;
+  dot.style.background='';
+  if(state==='regular'){
+    dot.className='mkt-dot open'; st.textContent='NYSE/NASDAQ geöffnet 🟢'; nx.textContent='Schließt 22:00 UTC';
+  }else if(state==='premarket'){
+    dot.className='mkt-dot open'; dot.style.background='var(--ye)'; st.textContent='Pre-Market aktiv ⚡'; nx.textContent='Regular ab 15:30 UTC';
+  }else if(state==='weekend'){
+    dot.className='mkt-dot'; st.textContent='Wochenende — Markt geschlossen'; nx.textContent='Öffnet Mo 13:00 UTC';
+  }else{
+    const now=new Date(), mins2=now.getUTCHours()*60+now.getUTCMinutes();
+    dot.className='mkt-dot'; st.textContent='After-Hours / geschlossen'; nx.textContent=mins2>=22*60?'Öffnet morgen 13:00 UTC':'Öffnet heute 13:00 UTC';
+  }
+}
+
+function startCountdown(totalSecs){
+  _cdSec=totalSecs;
+  if(_cdInterval) clearInterval(_cdInterval);
+  const fmt=s=>{const m=Math.floor(s/60),r=s%60;return m>0?`${m}m ${r<10?'0'+r:r}s`:`${s}s`;};
+  const upd=()=>{const el=$('refreshCountdown');if(el) el.textContent=fmt(_cdSec);};
+  upd();
+  _cdInterval=setInterval(()=>{_cdSec=Math.max(0,_cdSec-1);upd();},1000);
+}
+
+function scheduleRefresh(){
+  if(_refreshTimer) clearTimeout(_refreshTimer);
+  const{state,ms}=getMktState();
+  const label={'regular':'Börse offen','premarket':'Pre-Market','closed':'Börse zu','weekend':'Wochenende'}[state];
+  addLog(`⏱ Nächster Refresh in ${ms/60000}min (${label})`,'b');
+  startCountdown(ms/1000);
+  _refreshTimer=setTimeout(()=>{
+    fetchAll().catch(()=>updateUI()).then(()=>scheduleRefresh());
+  },ms);
+}
+
+updateMktStatusBar();
+setInterval(updateMktStatusBar,60*1000);
+scheduleRefresh();
+</script>
+</body>
+</html>
