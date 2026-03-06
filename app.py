@@ -1,97 +1,233 @@
 """
-MSTR Brain API Server
-Läuft auf Render.com (kostenlos) und liefert:
-- MSTR Aktienpreis (15min delayed via yfinance)
-- Bitcoin Preis (live via CoinGecko)
-- MSTR Optionskette (~42 DTE, Calls, Delta 0.05-0.12)
-- Fear & Greed Index
+MSTR Brain API Server v2.1
+- Polygon.io: Bulk Snapshot (ein einziger API-Call für alle Optionen)
+- Kein Rate-Limit Problem mehr
 """
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import yfinance as yf
-import requests
+import requests as req
 from datetime import datetime, timedelta
-import math
-import time
+import math, time, os, threading, schedule
 
 app = Flask(__name__)
-CORS(app)  # Erlaubt Zugriff vom Browser (deine HTML-App)
+CORS(app)
 
-# ─── Cache (vermeidet zu viele API-Calls) ───
+POLYGON_KEY  = os.environ.get('POLYGON_KEY', '')
+TG_BOT_TOKEN = os.environ.get('TG_BOT_TOKEN', '')
+TG_CHAT_ID   = os.environ.get('TG_CHAT_ID', '')
+
 _cache = {}
-CACHE_TTL = 300  # 5 Minuten
-
-def cached(key, fn):
+def cached(key, fn, ttl=300):
     now = time.time()
-    if key in _cache and now - _cache[key]['ts'] < CACHE_TTL:
+    if key in _cache and now - _cache[key]['ts'] < ttl:
         return _cache[key]['data']
     data = fn()
     _cache[key] = {'data': data, 'ts': now}
     return data
 
-# ─── Hilfsfunktionen ───
+def tg_send(msg):
+    if not TG_BOT_TOKEN or not TG_CHAT_ID:
+        return False
+    try:
+        req.post(f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage",
+            json={"chat_id": TG_CHAT_ID, "text": msg, "parse_mode": "HTML"}, timeout=8)
+        return True
+    except Exception as e:
+        print(f"Telegram Fehler: {e}")
+        return False
+
+_alarm_sent = {}
+def can_alarm(t):
+    now = time.time()
+    if now - _alarm_sent.get(t, 0) > 1800:
+        _alarm_sent[t] = now
+        return True
+    return False
 
 def norm_cdf(x):
-    """Kumulative Normalverteilung (für Delta-Berechnung)"""
     return 0.5 * (1 + math.erf(x / math.sqrt(2)))
 
 def bs_delta(S, K, T, sigma):
-    """Black-Scholes Call Delta"""
-    if T <= 0 or sigma <= 0:
+    if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
         return 0
     d1 = (math.log(S / K) + 0.5 * sigma**2 * T) / (sigma * math.sqrt(T))
     return norm_cdf(d1)
 
-def bs_price(S, K, T, sigma, r=0.05):
-    """Black-Scholes Call Preis"""
-    if T <= 0 or sigma <= 0:
-        return max(0, S - K)
-    d1 = (math.log(S / K) + r * T + 0.5 * sigma**2 * T) / (sigma * math.sqrt(T))
-    d2 = d1 - sigma * math.sqrt(T)
-    return S * norm_cdf(d1) - K * math.exp(-r * T) * norm_cdf(d2)
-
-def find_expiry_near_dte(expirations, target_dte=42):
-    """Wähle Expiry am nächsten zu target_dte"""
+def find_best_expiry(expirations, target_dte=42):
     today = datetime.today()
-    best = None
-    best_diff = 9999
+    best, best_diff = None, 9999
     for exp_str in expirations:
-        exp = datetime.strptime(exp_str, "%Y-%m-%d")
-        dte = (exp - today).days
-        if dte < 14:
-            continue  # zu nah
-        diff = abs(dte - target_dte)
-        if diff < best_diff:
-            best_diff = diff
-            best = exp_str
+        try:
+            dte = (datetime.strptime(exp_str, "%Y-%m-%d") - today).days
+            if dte < 14:
+                continue
+            diff = abs(dte - target_dte)
+            if diff < best_diff:
+                best_diff, best = diff, exp_str
+        except:
+            continue
     return best
 
-# ─── ENDPOINTS ───
+# ══════════════════════════════════════════
+# POLYGON — BULK SNAPSHOT (1 API-Call!)
+# ══════════════════════════════════════════
+def fetch_options_polygon(spot):
+    if not POLYGON_KEY:
+        return None
+    today = datetime.today()
+    exp_from = (today + timedelta(days=25)).strftime('%Y-%m-%d')
+    exp_to   = (today + timedelta(days=65)).strftime('%Y-%m-%d')
 
+    try:
+        # Schritt 1: Welche Expiries gibt es? (1 Call)
+        r = req.get("https://api.polygon.io/v3/reference/options/contracts", params={
+            "underlying_ticker": "MSTR",
+            "contract_type":     "call",
+            "expiration_date.gte": exp_from,
+            "expiration_date.lte": exp_to,
+            "limit": 250,
+            "apiKey": POLYGON_KEY
+        }, timeout=12)
+        contracts = r.json().get('results', [])
+        if not contracts:
+            print("Polygon: keine Contracts gefunden")
+            return None
+
+        # Bestes Expiry wählen
+        expiries  = sorted(set(c['expiration_date'] for c in contracts))
+        best_exp  = find_best_expiry(expiries, 42)
+        if not best_exp:
+            return None
+
+        filtered = [c for c in contracts if c['expiration_date'] == best_exp]
+        dte = (datetime.strptime(best_exp, "%Y-%m-%d") - today).days
+        T   = dte / 365.0
+        print(f"Polygon: {len(filtered)} Contracts für {best_exp} ({dte} DTE)")
+
+        # Schritt 2: BULK Snapshot — alle Tickers auf einmal (1 Call!)
+        tickers_str = ",".join(c['ticker'] for c in filtered[:250])
+        snap_r = req.get(
+            "https://api.polygon.io/v3/snapshot/options/MSTR",
+            params={
+                "expiration_date": best_exp,
+                "contract_type":   "call",
+                "limit":           250,
+                "apiKey":          POLYGON_KEY
+            },
+            timeout=15
+        )
+        snaps = snap_r.json().get('results', [])
+        print(f"Polygon: {len(snaps)} Snapshots erhalten")
+
+        rows = []
+        for snap in snaps:
+            try:
+                details = snap.get('details', {})
+                greeks  = snap.get('greeks', {})
+                day     = snap.get('day', {})
+                lq      = snap.get('last_quote', {})
+
+                strike  = float(details.get('strike_price', 0))
+                bid     = lq.get('bid') or day.get('open') or 0
+                ask     = lq.get('ask') or day.get('close') or 0
+                mid     = round((float(bid) + float(ask)) / 2, 2) if bid and ask else None
+                iv_raw  = snap.get('implied_volatility', 0) or 0
+                delta   = greeks.get('delta')
+
+                if delta is None:
+                    iv_use = iv_raw if iv_raw > 0.05 else 0.88
+                    delta  = bs_delta(spot, strike, T, iv_use)
+                delta = round(float(delta), 3)
+
+                if delta < 0.03 or delta > 0.22:
+                    continue
+
+                iv_pct = round(iv_raw * 100, 1) if iv_raw < 5 else round(float(iv_raw), 1)
+
+                rows.append({
+                    "strike":        strike,
+                    "delta":         delta,
+                    "bid":           round(float(bid), 2) if bid else None,
+                    "ask":           round(float(ask), 2) if ask else None,
+                    "mid":           mid,
+                    "iv":            iv_pct,
+                    "dte":           dte,
+                    "otm_pct":       round((strike - spot) / spot * 100, 1),
+                    "volume":        int(day.get('volume', 0) or 0),
+                    "open_interest": int(snap.get('open_interest', 0) or 0),
+                })
+            except Exception as e:
+                print(f"  Snap parse Fehler: {e}")
+                continue
+
+        rows.sort(key=lambda x: x['delta'], reverse=True)
+        print(f"Polygon: {len(rows)} Optionen nach Delta-Filter (0.03–0.22)")
+        return {
+            "expiry":  best_exp,
+            "dte":     dte,
+            "spot":    round(spot, 2),
+            "source":  "polygon.io",
+            "options": rows
+        }
+    except Exception as e:
+        print(f"Polygon Fehler: {e}")
+        return None
+
+# ══════════════════════════════════════════
+# FALLBACK: yfinance
+# ══════════════════════════════════════════
+def fetch_options_yfinance(spot):
+    try:
+        ticker  = yf.Ticker("MSTR")
+        exp_str = find_best_expiry(list(ticker.options), 42)
+        if not exp_str:
+            return None
+        calls   = ticker.option_chain(exp_str).calls
+        dte     = (datetime.strptime(exp_str, "%Y-%m-%d") - datetime.today()).days
+        T       = dte / 365.0
+        rows    = []
+        for _, row in calls.iterrows():
+            strike = float(row['strike'])
+            bid    = float(row['bid']) if row['bid'] > 0 else None
+            ask    = float(row['ask']) if row['ask'] > 0 else None
+            mid    = round((bid + ask) / 2, 2) if bid and ask else None
+            iv     = float(row['impliedVolatility']) if row['impliedVolatility'] > 0 else 0.88
+            delta  = round(bs_delta(spot, strike, T, iv), 3)
+            if delta < 0.03 or delta > 0.22:
+                continue
+            rows.append({"strike": strike, "delta": delta, "bid": bid, "ask": ask, "mid": mid,
+                         "iv": round(iv*100,1), "dte": dte,
+                         "otm_pct": round((strike-spot)/spot*100,1),
+                         "volume": int(row.get('volume',0) or 0),
+                         "open_interest": int(row.get('openInterest',0) or 0)})
+        rows.sort(key=lambda x: x['delta'], reverse=True)
+        return {"expiry": exp_str, "dte": dte, "spot": round(spot,2),
+                "source": "yfinance (15min delay)", "options": rows}
+    except Exception as e:
+        print(f"yfinance Fehler: {e}")
+        return None
+
+# ══════════════════════════════════════════
+# ENDPOINTS
+# ══════════════════════════════════════════
 @app.route('/')
 def index():
     return jsonify({
-        "status": "MSTR Brain API läuft ✅",
-        "endpoints": ["/mstr", "/btc", "/options", "/fg", "/all"]
+        "status":   "MSTR Brain API v2.1 ✅",
+        "polygon":  "aktiv" if POLYGON_KEY else "kein Key — yfinance Fallback",
+        "telegram": "aktiv" if TG_BOT_TOKEN else "nicht konfiguriert",
+        "endpoints": ["/all", "/mstr", "/btc", "/fg", "/options", "/alarm"]
     })
 
 @app.route('/mstr')
 def get_mstr():
     def fetch():
-        ticker = yf.Ticker("MSTR")
-        info = ticker.fast_info
-        price = info.last_price
-        prev_close = info.previous_close
-        change_pct = ((price - prev_close) / prev_close * 100) if prev_close else 0
-        return {
-            "price": round(price, 2),
-            "prev_close": round(prev_close, 2),
-            "change_pct": round(change_pct, 2),
-            "currency": "USD",
-            "delayed": True,
-            "as_of": datetime.utcnow().isoformat() + "Z"
-        }
+        info = yf.Ticker("MSTR").fast_info
+        p, pr = info.last_price, info.previous_close
+        return {"price": round(p,2), "change_pct": round((p-pr)/pr*100,2) if pr else 0,
+                "delayed": True, "as_of": datetime.utcnow().isoformat()+"Z"}
     try:
         return jsonify(cached('mstr', fetch))
     except Exception as e:
@@ -100,19 +236,13 @@ def get_mstr():
 @app.route('/btc')
 def get_btc():
     def fetch():
-        r = requests.get(
-            "https://api.coingecko.com/api/v3/simple/price",
-            params={"ids": "bitcoin", "vs_currencies": "usd",
-                    "include_24hr_change": "true", "include_7d_change": "true"},
-            timeout=8
-        )
-        data = r.json()["bitcoin"]
-        return {
-            "price": round(data["usd"]),
-            "change_24h": round(data.get("usd_24h_change", 0), 2),
-            "change_7d": round(data.get("usd_7d_change", 0), 2),
-            "as_of": datetime.utcnow().isoformat() + "Z"
-        }
+        r = req.get("https://api.coingecko.com/api/v3/simple/price",
+            params={"ids":"bitcoin","vs_currencies":"usd",
+                    "include_24hr_change":"true","include_7d_change":"true"}, timeout=8)
+        d = r.json()["bitcoin"]
+        return {"price": round(d["usd"]), "change_24h": round(d.get("usd_24h_change",0),2),
+                "change_7d": round(d.get("usd_7d_change",0),2),
+                "as_of": datetime.utcnow().isoformat()+"Z"}
     try:
         return jsonify(cached('btc', fetch))
     except Exception as e:
@@ -121,14 +251,10 @@ def get_btc():
 @app.route('/fg')
 def get_fg():
     def fetch():
-        r = requests.get("https://api.alternative.me/fng/?limit=2", timeout=8)
-        data = r.json()["data"]
-        return {
-            "value": int(data[0]["value"]),
-            "label": data[0]["value_classification"],
-            "yesterday": int(data[1]["value"]) if len(data) > 1 else None,
-            "as_of": datetime.utcnow().isoformat() + "Z"
-        }
+        data = req.get("https://api.alternative.me/fng/?limit=2", timeout=8).json()["data"]
+        return {"value": int(data[0]["value"]), "label": data[0]["value_classification"],
+                "yesterday": int(data[1]["value"]) if len(data)>1 else None,
+                "as_of": datetime.utcnow().isoformat()+"Z"}
     try:
         return jsonify(cached('fg', fetch))
     except Exception as e:
@@ -137,70 +263,14 @@ def get_fg():
 @app.route('/options')
 def get_options():
     def fetch():
-        ticker = yf.Ticker("MSTR")
-        expirations = ticker.options
-        if not expirations:
-            return {"error": "Keine Optionen gefunden"}
-
-        exp_str = find_expiry_near_dte(expirations, target_dte=42)
-        if not exp_str:
-            exp_str = expirations[0]
-
-        chain = ticker.option_chain(exp_str)
-        calls = chain.calls
-
-        # Aktueller MSTR-Preis
-        spot = ticker.fast_info.last_price
-
-        exp_date = datetime.strptime(exp_str, "%Y-%m-%d")
-        dte = (exp_date - datetime.today()).days
-        T = dte / 365.0
-
-        # IV aus ATM-Option schätzen (für Delta-Berechnung)
-        atm_iv = None
-        atm_calls = calls[(calls['strike'] >= spot * 0.95) & (calls['strike'] <= spot * 1.05)]
-        if not atm_calls.empty:
-            atm_iv = float(atm_calls['impliedVolatility'].mean())
-
-        result_rows = []
-        for _, row in calls.iterrows():
-            strike = float(row['strike'])
-            bid = float(row['bid']) if row['bid'] > 0 else None
-            ask = float(row['ask']) if row['ask'] > 0 else None
-            mid = round((bid + ask) / 2, 2) if bid and ask else None
-            iv = float(row['impliedVolatility']) if row['impliedVolatility'] > 0 else (atm_iv or 0.88)
-            delta = round(bs_delta(spot, strike, T, iv), 3)
-            otm_pct = round((strike - spot) / spot * 100, 1)
-
-            # Nur OTM Calls mit Delta 0.03–0.20
-            if delta < 0.03 or delta > 0.20:
-                continue
-
-            result_rows.append({
-                "strike": strike,
-                "delta": delta,
-                "bid": bid,
-                "ask": ask,
-                "mid": mid,
-                "iv": round(iv * 100, 1),
-                "dte": dte,
-                "otm_pct": otm_pct,
-                "volume": int(row.get('volume', 0) or 0),
-                "open_interest": int(row.get('openInterest', 0) or 0),
-            })
-
-        # Sortiere nach Delta absteigend (0.12 → 0.05)
-        result_rows.sort(key=lambda x: x['delta'], reverse=True)
-
-        return {
-            "expiry": exp_str,
-            "dte": dte,
-            "spot": round(spot, 2),
-            "options": result_rows,
-            "delayed": True,
-            "as_of": datetime.utcnow().isoformat() + "Z"
-        }
-
+        spot   = yf.Ticker("MSTR").fast_info.last_price
+        result = fetch_options_polygon(spot) if POLYGON_KEY else None
+        if not result:
+            result = fetch_options_yfinance(spot)
+        if not result:
+            return {"error": "Keine Optionsdaten verfügbar"}
+        result["as_of"] = datetime.utcnow().isoformat()+"Z"
+        return result
     try:
         return jsonify(cached('options', fetch))
     except Exception as e:
@@ -208,97 +278,161 @@ def get_options():
 
 @app.route('/all')
 def get_all():
-    """Alle Daten in einem Call — reduziert Latenz für die App"""
     def fetch_all():
-        results = {}
+        out  = {}
+        spot = 150.0
 
         # MSTR
         try:
-            ticker = yf.Ticker("MSTR")
-            info = ticker.fast_info
-            price = info.last_price
-            prev = info.previous_close
-            results['mstr'] = {
-                "price": round(price, 2),
-                "change_pct": round((price - prev) / prev * 100, 2) if prev else 0,
-                "delayed": True
-            }
+            info = yf.Ticker("MSTR").fast_info
+            p, pr = info.last_price, info.previous_close
+            spot  = p
+            out['mstr'] = {"price": round(p,2),
+                           "change_pct": round((p-pr)/pr*100,2) if pr else 0,
+                           "delayed": True}
         except Exception as e:
-            results['mstr'] = {"error": str(e)}
+            out['mstr'] = {"error": str(e)}
 
         # BTC
         try:
-            r = requests.get(
-                "https://api.coingecko.com/api/v3/simple/price",
-                params={"ids": "bitcoin", "vs_currencies": "usd",
-                        "include_24hr_change": "true", "include_7d_change": "true"},
-                timeout=8
-            )
+            r   = req.get("https://api.coingecko.com/api/v3/simple/price",
+                  params={"ids":"bitcoin","vs_currencies":"usd",
+                          "include_24hr_change":"true","include_7d_change":"true"}, timeout=8)
             btc = r.json()["bitcoin"]
-            results['btc'] = {
-                "price": round(btc["usd"]),
-                "change_24h": round(btc.get("usd_24h_change", 0), 2),
-                "change_7d": round(btc.get("usd_7d_change", 0), 2),
-            }
+            out['btc'] = {"price": round(btc["usd"]),
+                          "change_24h": round(btc.get("usd_24h_change",0),2),
+                          "change_7d":  round(btc.get("usd_7d_change",0),2)}
         except Exception as e:
-            results['btc'] = {"error": str(e)}
+            out['btc'] = {"error": str(e)}
 
         # Fear & Greed
         try:
-            r = requests.get("https://api.alternative.me/fng/?limit=2", timeout=8)
-            fg = r.json()["data"]
-            results['fg'] = {
-                "value": int(fg[0]["value"]),
-                "label": fg[0]["value_classification"],
-                "yesterday": int(fg[1]["value"]) if len(fg) > 1 else None,
-            }
+            fg = req.get("https://api.alternative.me/fng/?limit=2", timeout=8).json()["data"]
+            out['fg'] = {"value": int(fg[0]["value"]), "label": fg[0]["value_classification"],
+                         "yesterday": int(fg[1]["value"]) if len(fg)>1 else None}
         except Exception as e:
-            results['fg'] = {"error": str(e)}
+            out['fg'] = {"error": str(e)}
 
-        # Options
+        # Optionen
         try:
-            ticker = yf.Ticker("MSTR")
-            expirations = ticker.options
-            exp_str = find_expiry_near_dte(expirations, 42)
-            chain = ticker.option_chain(exp_str)
-            calls = chain.calls
-            spot = results['mstr'].get('price', ticker.fast_info.last_price)
-            exp_date = datetime.strptime(exp_str, "%Y-%m-%d")
-            dte = (exp_date - datetime.today()).days
-            T = dte / 365.0
-
-            rows = []
-            for _, row in calls.iterrows():
-                strike = float(row['strike'])
-                bid = float(row['bid']) if row['bid'] > 0 else None
-                ask = float(row['ask']) if row['ask'] > 0 else None
-                mid = round((bid + ask) / 2, 2) if bid and ask else None
-                iv = float(row['impliedVolatility']) if row['impliedVolatility'] > 0 else 0.88
-                delta = round(bs_delta(spot, strike, T, iv), 3)
-                if delta < 0.03 or delta > 0.20:
-                    continue
-                rows.append({
-                    "strike": strike, "delta": delta,
-                    "bid": bid, "ask": ask, "mid": mid,
-                    "iv": round(iv * 100, 1), "dte": dte,
-                    "otm_pct": round((strike - spot) / spot * 100, 1),
-                    "volume": int(row.get('volume', 0) or 0),
-                    "open_interest": int(row.get('openInterest', 0) or 0),
-                })
-            rows.sort(key=lambda x: x['delta'], reverse=True)
-            results['options'] = {"expiry": exp_str, "dte": dte, "spot": spot, "options": rows}
+            opts = fetch_options_polygon(spot) if POLYGON_KEY else None
+            if not opts:
+                opts = fetch_options_yfinance(spot)
+            out['options'] = opts or {"error": "Keine Daten"}
         except Exception as e:
-            results['options'] = {"error": str(e)}
+            out['options'] = {"error": str(e)}
 
-        results['as_of'] = datetime.utcnow().isoformat() + "Z"
-        return results
+        out['as_of'] = datetime.utcnow().isoformat()+"Z"
+        return out
 
     try:
         return jsonify(cached('all', fetch_all))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ══════════════════════════════════════════
+# TELEGRAM ALARM
+# ══════════════════════════════════════════
+@app.route('/alarm', methods=['POST'])
+def send_alarm():
+    if not TG_BOT_TOKEN or not TG_CHAT_ID:
+        return jsonify({"error": "Telegram nicht konfiguriert"}), 400
+
+    d      = request.json or {}
+    t      = d.get('type', 'unknown')
+    mstr   = d.get('mstr', '?')
+    strike = d.get('strike', '?')
+    buf    = d.get('buffer', '?')
+    dte    = d.get('dte', '?')
+    delta  = d.get('delta', '?')
+    ns     = d.get('new_strike', '?')
+    prem   = d.get('premium', '?')
+    cur    = d.get('current_val', '?')
+    fg     = d.get('fg', '?')
+    btc    = d.get('btc', 0)
+    ts     = datetime.utcnow().strftime('%d.%m. %H:%M UTC')
+    btc_fmt = f"${int(btc):,}".replace(',', '.') if isinstance(btc, (int,float)) and btc else f"${btc}"
+
+    if not can_alarm(t):
+        return jsonify({"status": "cooldown"}), 200
+
+    if t == 'roll':
+        msg = (f"⚡ <b>MSTR BRAIN — JETZT ROLLEN!</b>\n🕐 {ts}\n"
+               f"━━━━━━━━━━━━━━━━━━━━━\n"
+               f"📈 MSTR:   <b>${mstr}</b>\n🎯 Strike: <b>${strike}</b>\n"
+               f"⚠️ Puffer: <b>{buf}%</b> — unter 6%!\n📅 DTE: <b>{dte} Tage</b>\n"
+               f"━━━━━━━━━━━━━━━━━━━━━\n<b>Jetzt handeln:</b>\n"
+               f"① Buy-to-Close: Call ${strike}\n"
+               f"② Sell-to-Open: <b>${ns}</b> · Δ{delta} · 42 Tage\n"
+               f"③ NUR für Kredit! Kein Debit!\n"
+               f"━━━━━━━━━━━━━━━━━━━━━\n🌍 F&G: {fg} · BTC: {btc_fmt}")
+    elif t == 'warn':
+        msg = (f"⚠️ <b>MSTR BRAIN — Strike nähert sich</b>\n🕐 {ts}\n"
+               f"━━━━━━━━━━━━━━━━━━━━━\n"
+               f"📈 MSTR: <b>${mstr}</b>\n🎯 Strike: <b>${strike}</b>\n"
+               f"📊 Puffer: <b>{buf}%</b> — unter 12%\n📅 DTE: <b>{dte} Tage</b>\n"
+               f"━━━━━━━━━━━━━━━━━━━━━\n"
+               f"👀 Beobachten · Roll auf ${ns} vorbereiten · Δ{delta}\n"
+               f"🌍 F&G: {fg} · BTC: {btc_fmt}")
+    elif t == 'profit':
+        try:
+            gewinn = str(round((float(prem) - float(cur)) * 200))
+        except:
+            gewinn = '?'
+        msg = (f"💰 <b>MSTR BRAIN — Gewinnmitnahme!</b>\n🕐 {ts}\n"
+               f"━━━━━━━━━━━━━━━━━━━━━\n"
+               f"📈 MSTR: <b>${mstr}</b>\n🎯 Strike: <b>${strike}</b>\n"
+               f"💵 Kassiert: <b>${prem}/Aktie</b>\n📉 Aktuell: <b>${cur}/Aktie</b>\n"
+               f"✅ 75%+ Zeitwert verloren!\n"
+               f"━━━━━━━━━━━━━━━━━━━━━\n"
+               f"① Buy-to-Close: ~${cur}/Aktie\n"
+               f"② Gewinn: ~<b>${gewinn}</b> (2 Kontrakte)\n"
+               f"③ Neuer Zyklus: ${ns} · Δ{delta} · 42 Tage")
+    else:
+        msg = f"🔔 MSTR Brain: {t}\nMSTR: ${mstr} · Strike: ${strike}"
+
+    ok = tg_send(msg)
+    return jsonify({"status": "sent" if ok else "error", "type": t})
+
+# ══════════════════════════════════════════
+# MORGEN-BRIEFING (08:00 UTC)
+# ══════════════════════════════════════════
+def send_morning_briefing():
+    if not TG_BOT_TOKEN or not TG_CHAT_ID:
+        return
+    try:
+        info  = yf.Ticker("MSTR").fast_info
+        mstr  = round(info.last_price, 2)
+        prev  = info.previous_close
+        mchg  = round((mstr-prev)/prev*100, 2) if prev else 0
+        r     = req.get("https://api.coingecko.com/api/v3/simple/price",
+                params={"ids":"bitcoin","vs_currencies":"usd","include_24hr_change":"true"}, timeout=8)
+        btcd  = r.json()["bitcoin"]
+        btc   = round(btcd["usd"])
+        bchg  = round(btcd.get("usd_24h_change",0), 2)
+        fgd   = req.get("https://api.alternative.me/fng/?limit=1", timeout=8).json()["data"][0]
+        fg, fgl = int(fgd["value"]), fgd["value_classification"]
+        ts    = datetime.utcnow().strftime('%d.%m.%Y')
+        btc_f = f"${btc:,}".replace(',','.')
+        msg   = (f"☀️ <b>MSTR Brain — Morgen-Briefing {ts}</b>\n"
+                 f"━━━━━━━━━━━━━━━━━━━━━\n"
+                 f"📈 MSTR: <b>${mstr}</b>  {'+' if mchg>=0 else ''}{mchg}%\n"
+                 f"₿  BTC:  <b>{btc_f}</b>  {'+' if bchg>=0 else ''}{bchg}%\n"
+                 f"😱 F&G:  <b>{fg}</b> — {fgl}\n"
+                 f"━━━━━━━━━━━━━━━━━━━━━\n"
+                 f"App öffnen für Optionskette & Empfehlung 📱")
+        tg_send(msg)
+        print(f"Morgen-Briefing gesendet {ts}")
+    except Exception as e:
+        print(f"Morgen-Briefing Fehler: {e}")
+
+def run_scheduler():
+    schedule.every().day.at("08:00").do(send_morning_briefing)
+    while True:
+        schedule.run_pending()
+        time.sleep(30)
+
 if __name__ == '__main__':
-    import os
+    threading.Thread(target=run_scheduler, daemon=True).start()
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
