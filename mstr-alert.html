@@ -268,6 +268,26 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .dtbl tr:last-child td{border-bottom:none;}
 .dtbl .brain-row td{background:rgba(247,147,26,.08);}
 .dtbl .brain-badge{display:inline-block;font-size:.55rem;background:rgba(247,147,26,.15);color:var(--or);padding:1px 5px;border-radius:3px;font-weight:700;margin-left:4px;}
+
+/* ══ PRICE HERO ══ */
+.price-hero{display:grid;grid-template-columns:1fr 1px 1fr;margin:0;border-bottom:1px solid var(--border);background:var(--c2);}
+.ph-divider{background:var(--border);margin:16px 0;}
+.ph-card{padding:16px 18px 14px;}
+.ph-label{font-size:10px;text-transform:uppercase;letter-spacing:.18em;color:var(--mu);font-weight:700;margin-bottom:6px;}
+.ph-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+.ph-price{font-family:var(--disp);font-size:2.4rem;line-height:1;letter-spacing:.02em;color:var(--tx);transition:color .4s;}
+.ph-mstr .ph-price{color:var(--or);}
+.ph-btc .ph-price{color:var(--tx);}
+.ph-change{font-size:12px;font-weight:700;padding:2px 7px;border-radius:5px;}
+.ph-change.up{background:rgba(0,163,114,.12);color:var(--gr);}
+.ph-change.dn{background:rgba(224,48,80,.1);color:var(--re);}
+.ph-sub{font-size:10px;color:var(--mu);margin-top:4px;}
+.ph-input-row{display:flex;gap:7px;margin-top:10px;align-items:center;}
+.ph-input-row input{background:rgba(0,0,0,.06);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-family:var(--mono);font-size:13px;color:var(--tx);outline:none;width:110px;transition:border-color .2s;}
+.ph-input-row input:focus{border-color:var(--or);}
+.ph-input-row button{background:var(--or);color:#000;border:none;border-radius:7px;padding:7px 14px;font:700 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.07em;cursor:pointer;white-space:nowrap;}
+.ph-input-row button:active{opacity:.8;}
+
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
 .app>*{animation:fadeUp .3s ease both;}
 /* ── DELTA SELECTION TABLE ── */
@@ -278,7 +298,6 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .dtbl .brain-lbl{color:var(--or);font-weight:700;font-size:.62rem;background:rgba(247,147,26,.12);padding:2px 6px;border-radius:4px;}
 
 </style>
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body><div class="app">
 
@@ -298,12 +317,32 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   </div>
 </div>
 
-<!-- PRICE INPUT -->
-<div class="pbar">
-  <label>MSTR ($)</label>
-  <input type="number" id="mstrPrice" placeholder="146" step="0.5">
-  <button class="ok" onclick="applyPrice()">OK</button>
-  <span class="note" id="mstrNote">vom TradingView ablesen ↑</span>
+<!-- PRICE HERO BAR -->
+<div class="price-hero">
+  <!-- MSTR -->
+  <div class="ph-card ph-mstr">
+    <div class="ph-label">MSTR</div>
+    <div class="ph-row">
+      <div class="ph-price" id="mstrPriceDisplay">—</div>
+      <div class="ph-change" id="mstrChangeDisplay"></div>
+    </div>
+    <div class="ph-sub">~15min verzögert</div>
+    <div class="ph-input-row">
+      <input type="number" id="mstrPrice" placeholder="Kurs eingeben" step="0.5">
+      <button onclick="applyPrice()">OK</button>
+    </div>
+  </div>
+  <!-- Divider -->
+  <div class="ph-divider"></div>
+  <!-- BTC -->
+  <div class="ph-card ph-btc">
+    <div class="ph-label">BITCOIN</div>
+    <div class="ph-row">
+      <div class="ph-price" id="btcPriceDisplay">—</div>
+      <div class="ph-change" id="btcChangeDisplay"></div>
+    </div>
+    <div class="ph-sub" id="btcSubDisplay">Live · wird geladen</div>
+  </div>
 </div>
 
 <!-- LIVE INTEL -->
@@ -480,42 +519,39 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   </div>
 </div>
 
-<!-- EMAIL ALERTS -->
-<div class="sl">📧 E-Mail Benachrichtigungen</div>
+<!-- TELEGRAM ALERTS -->
+<div class="sl">📱 Telegram Alarme</div>
 <div class="set-wrap">
-  <div class="set-hdr" id="emailHdr" onclick="toggleEmail()">
-    <span>E-Mail Alarm Setup (kostenlos via EmailJS)</span>
-    <span class="set-tog" id="emailTog">▼</span>
+  <div class="set-hdr" id="tgHdr" onclick="toggleTG()">
+    <span>Telegram Bot Setup</span>
+    <span class="set-tog" id="tgTog">▼</span>
   </div>
-  <div class="set-body" id="emailBody">
-    <div style="background:rgba(26,106,191,.06);border:1px solid rgba(26,106,191,.18);border-radius:8px;padding:11px 12px;margin-bottom:12px;font-size:.6rem;line-height:1.7;color:var(--mu);">
-      <b style="color:var(--bl);">📋 Einmalige Einrichtung (3 Minuten):</b><br>
-      1. Gehe zu <b style="color:#fff">emailjs.com</b> → kostenlos registrieren (200 Mails/Monat gratis)<br>
-      2. "Add Service" → Gmail oder andere E-Mail wählen → verbinden<br>
-      3. "Email Templates" → neues Template erstellen:<br>
-      &nbsp;&nbsp;&nbsp;Subject: <code style="color:var(--or)">{{subject}}</code> &nbsp; Body: <code style="color(--or)">{{message}}</code><br>
-      4. Template-ID + Service-ID + Public Key kopieren und unten eintragen<br>
-      5. Speichern → Test-Mail senden → fertig!
+  <div class="set-body" id="tgBody">
+    <div style="background:rgba(42,127,212,.06);border:1px solid rgba(42,127,212,.18);border-radius:9px;padding:13px;margin-bottom:14px;font-size:11px;line-height:1.8;color:var(--mub);">
+      <b style="color:var(--bl);">📋 Einmalige Einrichtung (2 Minuten):</b><br>
+      1. Telegram öffnen → <b style="color:var(--tx);">@BotFather</b> suchen → /newbot<br>
+      2. Bot-Name eingeben → Bot-Token kopieren (sieht so aus: <code style="color:var(--or);">123456:ABC-DEF...</code>)<br>
+      3. Den neuen Bot anschreiben → irgendwas tippen<br>
+      4. Diese URL im Browser öffnen:<br>
+      &nbsp;&nbsp;<code style="color:var(--or);font-size:10px;">https://api.telegram.org/bot<b>TOKEN</b>/getUpdates</code><br>
+      5. <b style="color:var(--tx);">chat.id</b> aus der JSON-Antwort kopieren<br>
+      6. Token + Chat-ID unten eintragen → Speichern → Testen
     </div>
-    <div class="fr"><label>EmailJS Public Key</label><input type="text" id="iEJKey" placeholder="z.B. abc123XYZ_pubkey"></div>
-    <div class="fr"><label>EmailJS Service ID</label><input type="text" id="iEJService" placeholder="z.B. service_gmail_mstr"></div>
-    <div class="fr"><label>EmailJS Template ID</label><input type="text" id="iEJTemplate" placeholder="z.B. template_brain_alert"></div>
-    <div class="fr"><label>Deine E-Mail Adresse (Empfänger)</label><input type="email" id="iEmail" placeholder="deine@email.com"></div>
+    <div class="fr"><label>Bot Token</label><input type="text" id="iTGToken" placeholder="123456789:ABC-DEFGHIJKLMNOPabcdefghijklmnop"></div>
+    <div class="fr"><label>Chat ID</label><input type="text" id="iTGChat" placeholder="z.B. 987654321"></div>
     <div class="fr">
-      <label>Alarme senden bei</label>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
-        <div class="check-row"><input type="checkbox" id="eRoll" checked><span>⚡ Roll-Alarm (Puffer &lt; 6%)</span></div>
-        <div class="check-row"><input type="checkbox" id="eWarn" checked><span>⚠️ Warnung (Puffer &lt; 12%)</span></div>
-        <div class="check-row"><input type="checkbox" id="eDanger" checked><span>🚨 Kritisch / Gamma / Earnings</span></div>
-        <div class="check-row"><input type="checkbox" id="eProfit"><span>💰 25%-Gewinnmitnahme erreicht</span></div>
-        <div class="check-row"><input type="checkbox" id="eFG"><span>📊 F&amp;G Extremwert (&lt;15 oder &gt;80)</span></div>
+      <label>Alarme aktiv für</label>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+        <div class="check-row"><input type="checkbox" id="tgRoll" checked><span>⚡ Roll-Alarm (Puffer &lt; 6%)</span></div>
+        <div class="check-row"><input type="checkbox" id="tgWarn" checked><span>⚠️ Warnung (Puffer &lt; 12%)</span></div>
+        <div class="check-row"><input type="checkbox" id="tgProfit" checked><span>💰 25% Gewinnmitnahme erreicht</span></div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
-      <button class="save-btn" style="margin-top:0" onclick="saveEmail()">SPEICHERN</button>
-      <button class="save-btn" style="margin-top:0;background:var(--bl);color:#fff" onclick="testEmail()">TEST-MAIL</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;">
+      <button class="save-btn" style="margin-top:0;" onclick="saveTG()">SPEICHERN</button>
+      <button class="save-btn" style="margin-top:0;background:var(--bl);color:#fff;" onclick="testTG()">TEST ✈️</button>
     </div>
-    <div id="emailStatus" style="margin-top:9px;font-size:.58rem;color:var(--mu);text-align:center;min-height:18px;"></div>
+    <div id="tgStatus" style="margin-top:9px;font-size:11px;color:var(--mu);text-align:center;min-height:16px;"></div>
   </div>
 </div>
 
@@ -633,7 +669,7 @@ async function fetchAll(){
       renderChainInputs();
     }
 
-    renderFG(); renderBTC(); computeTrend();
+    renderFG(); renderBTC(); computeTrend(); updatePriceHero();
     const asOf = d.as_of ? new Date(d.as_of).toLocaleTimeString('de-DE') : '—';
     $('lastUpd').textContent = '✅ Server-Daten · Stand: '+asOf+' UTC · MSTR+Optionen ~15min verzögert';
     addLog('✅ Server-Daten geladen: MSTR $'+S.price+' · BTC $'+S.btcPrice.toLocaleString('de-DE')+' · '+opts.length+' Optionen','g');
@@ -1112,7 +1148,24 @@ function renderSc(){
 // ══════════════════════════════════════════
 // UPDATE ALL UI
 // ══════════════════════════════════════════
+
+// ── Update Price Hero ──
+function updatePriceHero(){
+  const mp=$('mstrPriceDisplay'), mc=$('mstrChangeDisplay');
+  if(mp) mp.textContent = S.price ? '$'+S.price.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+  if(mc && S.mstrChange!=null){
+    const c=S.mstrChange;
+    mc.textContent=(c>=0?'+':'')+c.toFixed(2)+'%';
+    mc.className='ph-change '+(c>=0?'up':'dn');
+  }
+  const bp=$('btcPriceDisplay'), bc=$('btcChangeDisplay'), bs=$('btcSubDisplay');
+  if(bp && S.btcPrice) bp.textContent='$'+Math.round(S.btcPrice).toLocaleString('de-DE');
+  if(bc){const c=S.btcChange1d||0;bc.textContent=(c>=0?'+':'')+c.toFixed(2)+'%';bc.className='ph-change '+(c>=0?'up':'dn');}
+  if(bs) bs.textContent='Live · 7d: '+(S.btcChange7d>=0?'+':'')+((S.btcChange7d||0).toFixed(1))+'%';
+}
+
 function updateUI(){
+  updatePriceHero();
   const{price,strike,expiry,iv,ivr}=S;
   const{delta,facts,reasons}=computeDelta();
 
@@ -1222,156 +1275,125 @@ function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
 function fmtDate(d){return d.toLocaleDateString('de-DE',{day:'numeric',month:'long'});}
 
 // ══════════════════════════════════════════
-// EMAIL ALERTS
+// TELEGRAM ALARME
 // ══════════════════════════════════════════
-const E = {
-  key:'', service:'', template:'', email:'',
-  roll:true, warn:true, danger:true, profit:false, fg:false,
+const TG = {
+  token:'', chat:'',
+  roll:true, warn:true, profit:true,
   lastSent:{},
 };
 
-function loadEmail(){
+function loadTG(){
   try{
-    const d=JSON.parse(localStorage.getItem('mstr_email_v1')||'{}');
-    ['key','service','template','email','roll','warn','danger','profit','fg'].forEach(k=>{if(d[k]!==undefined)E[k]=d[k];});
-    if(E.key) $('iEJKey').value=E.key;
-    if(E.service) $('iEJService').value=E.service;
-    if(E.template) $('iEJTemplate').value=E.template;
-    if(E.email) $('iEmail').value=E.email;
-    $('eRoll').checked=E.roll!==false;
-    $('eWarn').checked=E.warn!==false;
-    $('eDanger').checked=E.danger!==false;
-    $('eProfit').checked=E.profit===true;
-    $('eFG').checked=E.fg===true;
+    const d=JSON.parse(localStorage.getItem('mstr_tg_v1')||'{}');
+    ['token','chat','roll','warn','profit'].forEach(k=>{if(d[k]!==undefined)TG[k]=d[k];});
+    if(TG.token){const el=$('iTGToken');if(el)el.value=TG.token;}
+    if(TG.chat) {const el=$('iTGChat'); if(el)el.value=TG.chat;}
+    const r=$('tgRoll'),w=$('tgWarn'),p=$('tgProfit');
+    if(r)r.checked=TG.roll!==false;
+    if(w)w.checked=TG.warn!==false;
+    if(p)p.checked=TG.profit!==false;
   }catch(e){}
 }
 
-function saveEmail(){
-  E.key=$('iEJKey').value.trim();
-  E.service=$('iEJService').value.trim();
-  E.template=$('iEJTemplate').value.trim();
-  E.email=$('iEmail').value.trim();
-  E.roll=$('eRoll').checked;
-  E.warn=$('eWarn').checked;
-  E.danger=$('eDanger').checked;
-  E.profit=$('eProfit').checked;
-  E.fg=$('eFG').checked;
-  try{localStorage.setItem('mstr_email_v1',JSON.stringify(E));}catch(e){}
-  setEmailStatus('✅ Gespeichert!','var(--gr)');
-  addLog('📧 E-Mail Einstellungen gespeichert','g');
+function saveTG(){
+  TG.token = ($('iTGToken').value||'').trim();
+  TG.chat  = ($('iTGChat').value||'').trim();
+  TG.roll   = $('tgRoll').checked;
+  TG.warn   = $('tgWarn').checked;
+  TG.profit = $('tgProfit').checked;
+  try{localStorage.setItem('mstr_tg_v1',JSON.stringify(TG));}catch(e){}
+  setTGStatus('✅ Gespeichert!','var(--gr)');
+  addLog('📱 Telegram Einstellungen gespeichert','g');
 }
 
-function setEmailStatus(msg,color){
-  const el=$('emailStatus');
+function setTGStatus(msg,color){
+  const el=$('tgStatus');
   if(el){el.textContent=msg;el.style.color=color||'var(--mu)';}
 }
 
-async function initEJ(){
-  if(typeof emailjs!=='undefined'){emailjs.init({publicKey:E.key});return true;}
-  return false;
-}
-
-async function sendAlert(type, subject, message){
-  if(!E.key||!E.service||!E.template||!E.email) return;
+// Sendet Alarm über Render-Server /alarm endpoint
+async function fireAlarm(type, payload){
+  if(!API_BASE) return; // braucht Render-Server
   const now=Date.now();
-  if(E.lastSent[type] && now-E.lastSent[type] < 30*60*1000) return; // max 1x per 30min
-  E.lastSent[type]=now;
+  if(TG.lastSent[type] && now-TG.lastSent[type]<30*60*1000) return; // 30min cooldown
+  TG.lastSent[type]=now;
   try{
-    await initEJ();
-    await emailjs.send(E.service, E.template, {to_email:E.email, subject:subject, message:message});
-    addLog('📧 Mail gesendet: '+subject,'g');
-  }catch(err){
-    addLog('📧 Mail-Fehler: '+(err.text||err.message||JSON.stringify(err)),'r');
-  }
-}
-
-async function testEmail(){
-  if(!E.key||!E.service||!E.template||!E.email){
-    setEmailStatus('⚠️ Bitte alle 4 Felder ausfüllen und zuerst speichern!','var(--ye)'); return;
-  }
-  setEmailStatus('⏳ Sende Test-Mail...','var(--mu)');
-  try{
-    await initEJ();
-    const{delta}=computeDelta();
-    await emailjs.send(E.service, E.template, {
-      to_email:E.email,
-      subject:'MSTR Brain Test-Alarm ✅',
-      message:'MSTR Brain v5 funktioniert korrekt!\n\nAktuelle Werte:\n'
-        +'• MSTR Kurs: $'+(S.price||'—')+'\n'
-        +'• BTC: $'+Math.round(S.btcPrice).toLocaleString('de-DE')+'\n'
-        +'• Fear & Greed: '+S.fg+' ('+S.fgLabel+')\n'
-        +'• BTC Trend: '+getEffTrend()+'\n'
-        +'• Empfohlenes Delta: '+delta+'\n'
-        +'• Dein Strike: $'+(S.strike||'—')+'\n\n'
-        +'Du wirst bei wichtigen Ereignissen automatisch benachrichtigt.',
+    const r=await fetch(API_BASE+'/alarm',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type,...payload,
+        fg:S.fg, btc:S.btcPrice?Math.round(S.btcPrice):0,
+        fg_label:S.fgLabel
+      })
     });
-    setEmailStatus('✅ Test-Mail gesendet! Prüfe dein Postfach.','var(--gr)');
-    addLog('📧 Test-Mail gesendet an '+E.email,'g');
-  }catch(err){
-    setEmailStatus('❌ Fehler: '+(err.text||err.message||JSON.stringify(err)),'var(--re)');
+    const d=await r.json();
+    if(d.status==='sent'){
+      addLog('📱 Telegram-Alarm gesendet: '+type,'g');
+    } else if(d.status==='cooldown'){
+      addLog('📱 Alarm-Cooldown aktiv (30min)','b');
+    }
+  }catch(e){
+    addLog('📱 Telegram-Fehler: '+e.message,'r');
   }
 }
 
-let emailOpen=false;
-function toggleEmail(){emailOpen=!emailOpen;$('emailBody').classList.toggle('open',emailOpen);$('emailHdr').classList.toggle('open',emailOpen);}
+async function testTG(){
+  if(!TG.token||!TG.chat){
+    setTGStatus('⚠️ Token + Chat-ID eintragen und speichern!','var(--ye)');return;
+  }
+  // Direkt via Telegram API testen (ohne Server)
+  setTGStatus('⏳ Sende Test-Nachricht...','var(--mu)');
+  try{
+    const{delta}=computeDelta();
+    const msg = '✅ MSTR Brain Test\n━━━━━━━━━━━━━━━━━━━━━\n'
+      +'📈 MSTR: $'+(S.price||'—')+'\n'
+      +'₿  BTC:  $'+(S.btcPrice?Math.round(S.btcPrice).toLocaleString('de-DE'):'—')+'\n'
+      +'😱 F\u0026G: '+S.fg+' ('+S.fgLabel+')\n'
+      +'🧠 Delta: Δ'+delta+'\n'
+      +'━━━━━━━━━━━━━━━━━━━━━\n'
+      +'Telegram-Alarme funktionieren! 🎉';
+    const r=await fetch('https://api.telegram.org/bot'+TG.token+'/sendMessage',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:TG.chat, text:msg})
+    });
+    const d=await r.json();
+    if(d.ok){
+      setTGStatus('✅ Nachricht gesendet! Schau in Telegram.','var(--gr)');
+      addLog('📱 Telegram Test erfolgreich','g');
+    } else {
+      setTGStatus('❌ Fehler: '+(d.description||JSON.stringify(d)),'var(--re)');
+    }
+  }catch(e){
+    setTGStatus('❌ Fehler: '+e.message,'var(--re)');
+  }
+}
+
+let tgOpen=false;
+function toggleTG(){tgOpen=!tgOpen;$('tgBody').classList.toggle('open',tgOpen);$('tgHdr').classList.toggle('open',tgOpen);}
 
 function checkAndFireAlerts(st){
-  if(!E.key||!E.service||!E.template||!E.email) return;
-  const{price,strike,iv}=S;
+  if(!API_BASE) return; // braucht Render-Server für Telegram
+  const{price,strike,premium,iv}=S;
+  if(!price||!strike) return;
   const{delta}=computeDelta();
-  const rollStrike=price?strikeFromDelta(price,delta,42,iv):'—';
-  const btcStr='$'+Math.round(S.btcPrice).toLocaleString('de-DE');
+  const ns=strikeFromDelta(price,delta,42,iv)||'—';
+  const buf=((strike-price)/price*100).toFixed(1);
+  const dte=S.expiry?Math.max(0,Math.ceil((new Date(S.expiry)-new Date())/86400000)):null;
+  const payload={mstr:price,strike,buffer:buf,dte:dte||'—',delta,new_strike:ns};
 
-  if(E.danger && st.cls==='ac-danger'){
-    sendAlert('danger','🚨 MSTR Brain: SOFORT HANDELN! — '+st.title,
-      st.title+'\n\n'+(st.body||'').replace(/<[^>]+>/g,'')+'\n\n'
-      +'MSTR Kurs: $'+(price||'—')+'\nDein Strike: $'+(strike||'—')+'\n'
-      +'F&G: '+S.fg+' | BTC: '+btcStr);
+  if(TG.roll && st.cls==='ac-roll'){
+    fireAlarm('roll', payload);
   }
-  if(E.roll && st.cls==='ac-roll'){
-    sendAlert('roll','⚡ MSTR Brain: Jetzt ROLLEN — Strike $'+strike,
-      'Dein Call nähert sich dem Strike!\n\n'
-      +'MSTR Kurs: $'+price+'\nDein aktueller Strike: $'+strike+'\n\n'
-      +'>> Empfohlener Roll:\n'
-      +'   Neuer Strike: $'+rollStrike+'\n'
-      +'   Delta: '+delta+'\n'
-      +'   Laufzeit: 42 Tage\n'
-      +'   Regel: NUR für Kredit rollen — nie Debit zahlen!\n\n'
-      +'F&G: '+S.fg+' | BTC: '+btcStr);
+  if(TG.warn && st.cls==='ac-warn'){
+    fireAlarm('warn', payload);
   }
-  if(E.warn && st.cls==='ac-warn'){
-    sendAlert('warn','⚠️ MSTR Brain: Strike nähert sich — Puffer unter 12%',
-      'Bitte beobachten — kein sofortiger Handlungsbedarf.\n\n'
-      +'MSTR Kurs: $'+price+'\nDein Strike: $'+strike+'\n\n'
-      +'Falls Roll nötig wird:\n'
-      +'   Neuer Strike: $'+rollStrike+' | Delta: '+delta+' | 42 Tage\n\n'
-      +'F&G: '+S.fg+' | BTC: '+btcStr);
-  }
-  if(E.profit && st.cls==='ac-open' && st.bt&&st.bt.includes('Gewinn')){
-    sendAlert('profit','💰 MSTR Brain: 25% Gewinnmitnahme erreicht!',
-      'Dein Call hat 75%+ des Zeitwerts verloren.\n\n'
-      +'Empfehlung:\n'
-      +'1. Buy-to-Close: aktueller Call\n'
-      +'2. Sofort neuen Call eröffnen:\n'
-      +'   Strike: $'+rollStrike+' | Delta: '+delta+' | 42 Tage\n\n'
-      +'MSTR: $'+price+' | F&G: '+S.fg);
-  }
-  if(E.fg){
-    const fg=S.fg;
-    if(fg<=15) sendAlert('fg_low','😱 MSTR Brain: Extreme Fear '+fg+' — Historischer Tiefstwert!',
-      'Fear & Greed Index: '+fg+' ('+S.fgLabel+')\n\n'
-      +'Das ist tiefer als FTX-Crash (12) und COVID (9).\n'
-      +'Historisch: Solche Level = Bodenzone. Rebound kann brutal sein.\n\n'
-      +'Empfohlenes Delta: '+delta+' (ultra-konservativ)\n'
-      +'BTC: '+btcStr);
-    else if(fg>=80) sendAlert('fg_high','🤑 MSTR Brain: Extreme Greed '+fg+' — FOMO aktiv!',
-      'Fear & Greed Index: '+fg+' ('+S.fgLabel+')\n\n'
-      +'WARNUNG: Tops entstehen in Greed-Phasen.\n'
-      +'Delta gedeckelt auf 0.10 — kein Risiko eingehen!\n'
-      +'BTC: '+btcStr);
+  if(TG.profit && st.cls==='ac-open' && st.bt&&st.bt.includes('Gewinn')){
+    const cur=premium?estPrem(price,strike,dte||21,iv):0;
+    fireAlarm('profit', {...payload, premium:premium||'?', current_val:cur.toFixed(2)});
   }
 }
-
 
 // ══════════════════════════════════════════
 // MANUAL OPTIONS CHAIN
@@ -1450,7 +1472,7 @@ function toggleChain(){
 $('t0').textContent=new Date().toLocaleTimeString('de-DE');
 loadState();
 renderChainInputs();
-loadEmail();
+loadTG();
 if(!S.strike&&!S.noPos)toggleSet();
 
 // Render with saved/default data first
