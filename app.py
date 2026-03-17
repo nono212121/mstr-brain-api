@@ -121,46 +121,24 @@ def wb_get_ticker_id(symbol="MSTR"):
         print(f"Ticker ID Fehler: {e}")
         return None
 
-def wb_get_quote(ticker_id):
-    """MSTR Kurs von Webull — probiert mehrere Endpoints"""
-    urls = [
-        f"https://quotes-gw.webullfintech.com/api/stock/tickerQuote?tickerId={ticker_id}&includeSecu=1",
-        f"https://quotes-gw.webullfintech.com/api/quote/tickerSnapshot?tickerIds={ticker_id}",
-        f"https://quotes-gw.webullfintech.com/api/stock/tickerRealTime/queryByTicker?tickerIds={ticker_id}",
-    ]
-    for url in urls:
-        try:
-            r = req.get(url, headers=WEBULL_HEADERS, timeout=10)
-            d = r.json()
-            if isinstance(d, list) and len(d) > 0:
-                d = d[0]
-            price = 0
-            for field in ["close","pPrice","lastPrice","last","price","currentPrice","latestPrice","open"]:
-                val = d.get(field)
-                if val:
-                    try:
-                        price = float(val)
-                        if price > 0:
-                            break
-                    except:
-                        pass
-            if price > 0:
-                pre = 0
-                for field in ["preClose","prevClose","previousClose","open"]:
-                    val = d.get(field)
-                    if val:
-                        try:
-                            pre = float(val)
-                            break
-                        except:
-                            pass
-                print(f"Quote OK: ${price} (url={url.split('?')[0].split('/')[-1]})")
-                return {"price": round(price, 2),
-                        "change_pct": round((price-pre)/pre*100, 2) if pre else 0}
-            print(f"Quote 0 from {url.split('/')[-1]}: keys={list(d.keys())[:8]}")
-        except Exception as e:
-            print(f"Quote err: {e}")
-    return None
+def wb_get_quote(ticker_id=None):
+    """MSTR Preis via CoinGecko MSTRX (tokenisierter MSTR, 1:1 gedeckt)"""
+    try:
+        r = req.get("https://api.coingecko.com/api/v3/simple/price",
+            params={"ids": "microstrategy-xstock",
+                    "vs_currencies": "usd",
+                    "include_24hr_change": "true"},
+            timeout=8)
+        d = r.json().get("microstrategy-xstock", {})
+        price = round(float(d.get("usd", 0)), 2)
+        chg   = round(float(d.get("usd_24h_change", 0)), 2)
+        if price > 0:
+            print(f"MSTR via MSTRX: ${price} ({chg}%)")
+            return {"price": price, "change_pct": chg}
+        return None
+    except Exception as e:
+        print(f"MSTRX Quote Fehler: {e}")
+        return None
 
 def wb_get_options(ticker_id, spot):
     """Optionskette von Webull — ~42 DTE, Calls, Delta 0.03-0.22"""
