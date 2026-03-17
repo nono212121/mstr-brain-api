@@ -122,18 +122,45 @@ def wb_get_ticker_id(symbol="MSTR"):
         return None
 
 def wb_get_quote(ticker_id):
-    """MSTR Kurs von Webull"""
-    try:
-        url = f"https://quotes-gw.webullfintech.com/api/stock/tickerQuote?tickerId={ticker_id}&includeSecu=1"
-        r = req.get(url, headers=WEBULL_HEADERS, timeout=10)
-        d = r.json()
-        price     = float(d.get("close") or d.get("pPrice") or 0)
-        pre_close = float(d.get("preClose") or 0)
-        chg_pct   = round((price - pre_close) / pre_close * 100, 2) if pre_close else 0
-        return {"price": round(price, 2), "change_pct": chg_pct}
-    except Exception as e:
-        print(f"Webull Quote Fehler: {e}")
-        return None
+    """MSTR Kurs von Webull — probiert mehrere Endpoints"""
+    urls = [
+        f"https://quotes-gw.webullfintech.com/api/stock/tickerQuote?tickerId={ticker_id}&includeSecu=1",
+        f"https://quotes-gw.webullfintech.com/api/quote/tickerSnapshot?tickerIds={ticker_id}",
+        f"https://quotes-gw.webullfintech.com/api/stock/tickerRealTime/queryByTicker?tickerIds={ticker_id}",
+    ]
+    for url in urls:
+        try:
+            r = req.get(url, headers=WEBULL_HEADERS, timeout=10)
+            d = r.json()
+            if isinstance(d, list) and len(d) > 0:
+                d = d[0]
+            price = 0
+            for field in ["close","pPrice","lastPrice","last","price","currentPrice","latestPrice","open"]:
+                val = d.get(field)
+                if val:
+                    try:
+                        price = float(val)
+                        if price > 0:
+                            break
+                    except:
+                        pass
+            if price > 0:
+                pre = 0
+                for field in ["preClose","prevClose","previousClose","open"]:
+                    val = d.get(field)
+                    if val:
+                        try:
+                            pre = float(val)
+                            break
+                        except:
+                            pass
+                print(f"Quote OK: ${price} (url={url.split('?')[0].split('/')[-1]})")
+                return {"price": round(price, 2),
+                        "change_pct": round((price-pre)/pre*100, 2) if pre else 0}
+            print(f"Quote 0 from {url.split('/')[-1]}: keys={list(d.keys())[:8]}")
+        except Exception as e:
+            print(f"Quote err: {e}")
+    return None
 
 def wb_get_options(ticker_id, spot):
     """Optionskette von Webull — ~42 DTE, Calls, Delta 0.03-0.22"""
@@ -252,9 +279,30 @@ def debug():
         url = "https://quotes-gw.webullfintech.com/api/search/pc/tickers?keyword=MSTR&pageIndex=1&pageSize=5"
         r = req.get(url, headers=WEBULL_HEADERS, timeout=10)
         results['ticker_status'] = r.status_code
-        results['ticker_raw'] = r.json()
+        # Only show MSTR result
+        data = r.json().get('data', [])
+        mstr = next((x for x in data if x.get('symbol') == 'MSTR'), None)
+        results['ticker_id'] = mstr.get('tickerId') if mstr else None
     except Exception as e:
         results['ticker_error'] = str(e)
+    # Test quote endpoint directly
+    try:
+        tid = "913323987"
+        url = f"https://quotes-gw.webullfintech.com/api/stock/tickerQuote?tickerId={tid}&includeSecu=1"
+        r = req.get(url, headers=WEBULL_HEADERS, timeout=10)
+        results['quote_status'] = r.status_code
+        results['quote_raw'] = r.json()
+    except Exception as e:
+        results['quote_error'] = str(e)
+    # Test quote endpoint
+    try:
+        tid = "913323987"
+        url = f"https://quotes-gw.webullfintech.com/api/stock/tickerQuote?tickerId={tid}&includeSecu=1"
+        r = req.get(url, headers=WEBULL_HEADERS, timeout=10)
+        results['quote_status'] = r.status_code
+        results['quote_raw'] = r.json()
+    except Exception as e:
+        results['quote_error'] = str(e)
     results['wb_phone_set'] = bool(WB_PHONE)
     results['wb_email_set'] = bool(WB_EMAIL)
     results['wb_password_set'] = bool(WB_PASSWORD)
