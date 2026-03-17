@@ -1,27 +1,24 @@
 """
-MSTR Brain API Server v2.3
-- MSTR Preis + Optionskette: Webull inoffizieller Wrapper (kostenlos, kein Broker-Account)
-- Bitcoin: CoinGecko (live)
+MSTR Brain API Server v3.0
+- MSTR Preis:   CoinGecko MSTRX token (tokenisierter MSTR)
+- Bitcoin:      CoinGecko (live)
 - Fear & Greed: alternative.me (live)
-- Telegram: Roll, Warnung, Gewinnmitnahme, Morgen-Briefing 08:00 UTC
+- Optionskette: Black-Scholes Schätzung (kein externer Service nötig)
+- Telegram:     Roll, Warnung, Gewinnmitnahme, Morgen-Briefing 08:00 UTC
 """
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import requests as req
 from datetime import datetime, timedelta
-import math, time, os, threading, schedule, json
+import math, time, os, threading, schedule
 
 app = Flask(__name__)
 CORS(app)
 
-TG_BOT_TOKEN  = os.environ.get('TG_BOT_TOKEN', '')
-TG_CHAT_ID    = os.environ.get('TG_CHAT_ID', '')
-WB_EMAIL      = os.environ.get('WB_EMAIL', '')      # Email ODER Telefon
-WB_PHONE      = os.environ.get('WB_PHONE', '')      # z.B. +4915112345678
-WB_PASSWORD   = os.environ.get('WB_PASSWORD', '')
+TG_BOT_TOKEN = os.environ.get('TG_BOT_TOKEN', '')
+TG_CHAT_ID   = os.environ.get('TG_CHAT_ID', '')
 
-# ─── Cache 5 Minuten ───
 _cache = {}
 def cached(key, fn, ttl=300):
     now = time.time()
@@ -31,7 +28,6 @@ def cached(key, fn, ttl=300):
     _cache[key] = {'data': data, 'ts': now}
     return data
 
-# ─── Telegram ───
 def tg_send(msg):
     if not TG_BOT_TOKEN or not TG_CHAT_ID:
         return False
@@ -51,7 +47,7 @@ def can_alarm(t):
         return True
     return False
 
-# ─── Black-Scholes Delta ───
+# ─── Black-Scholes ───
 def norm_cdf(x):
     return 0.5 * (1 + math.erf(x / math.sqrt(2)))
 
@@ -61,68 +57,29 @@ def bs_delta(S, K, T, sigma):
     d1 = (math.log(S / K) + 0.5 * sigma**2 * T) / (sigma * math.sqrt(T))
     return norm_cdf(d1)
 
-def find_best_expiry_days(expirations, target_dte=42):
-    """expirations = list of 'YYYY-MM-DD' strings"""
-    today = datetime.today()
-    best, best_diff = None, 9999
-    for exp_str in expirations:
-        try:
-            dte = (datetime.strptime(exp_str, "%Y-%m-%d") - today).days
-            if dte < 14:
-                continue
-            diff = abs(dte - target_dte)
-            if diff < best_diff:
-                best_diff, best = diff, exp_str
-        except:
-            continue
-    return best
+def bs_price(S, K, T, sigma, r=0.05):
+    if T <= 0 or sigma <= 0:
+        return max(0, S - K)
+    d1 = (math.log(S / K) + r * T + 0.5 * sigma**2 * T) / (sigma * math.sqrt(T))
+    d2 = d1 - sigma * math.sqrt(T)
+    return S * norm_cdf(d1) - K * math.exp(-r * T) * norm_cdf(d2)
+
+def strike_from_delta(S, delta, T, sigma):
+    lo, hi = S * 0.5, S * 2.0
+    for _ in range(50):
+        mid = (lo + hi) / 2
+        if bs_delta(S, mid, T, sigma) > delta:
+            lo = mid
+        else:
+            hi = mid
+    return round((lo + hi) / 2, 0)
 
 # ══════════════════════════════════════════
-# WEBULL SESSION
+# MSTR PREIS — CoinGecko MSTRX
 # ══════════════════════════════════════════
-_wb_session = {"token": None, "expires": 0, "account_id": None}
-
-WEBULL_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-    "did": "8a7f3d2e1c4b5a6f",  # Device ID
-    "tz": "Europe/Berlin",
-    "app": "global",
-    "ver": "3.40.8",
-    "lver": "2.40.8",
-    "platform": "web",
-    "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8",
-}
-
-def wb_login():
-    # Webull blockiert Logins von Cloud-Server-IPs (503)
-    # Quote + Optionen funktionieren als public endpoints ohne Login
-    return None
-
-
-def wb_get_token():
-    """Token holen, ggf. neu einloggen"""
-    if _wb_session["token"] and time.time() < _wb_session["expires"]:
-        return _wb_session["token"]
-    return wb_login()
-
-def wb_get_ticker_id(symbol="MSTR"):
-    """Webull interne Ticker-ID für ein Symbol"""
-    try:
-        url = f"https://quotes-gw.webullfintech.com/api/search/pc/tickers?keyword={symbol}&pageIndex=1&pageSize=5"
-        r = req.get(url, headers=WEBULL_HEADERS, timeout=10)
-        data = r.json().get("data", [])
-        for item in data:
-            if item.get("tickerSymbol") == symbol and item.get("exchangeCode") in ("NASDAQ", "NYSE", "NSQ", "NMS", "NGS"):
-                return str(item["tickerId"])
-        return None
-    except Exception as e:
-        print(f"Ticker ID Fehler: {e}")
-        return None
-
-def wb_get_quote(ticker_id=None):
-    """MSTR Preis via CoinGecko MSTRX (tokenisierter MSTR, 1:1 gedeckt)"""
+def fetch_mstr_price():
+    """MSTR via tokenisierten MSTRX Token auf CoinGecko"""
+    # Versuch 1: MSTRX (MicroStrategy xStock)
     try:
         r = req.get("https://api.coingecko.com/api/v3/simple/price",
             params={"ids": "microstrategy-xstock",
@@ -130,189 +87,109 @@ def wb_get_quote(ticker_id=None):
                     "include_24hr_change": "true"},
             timeout=8)
         d = r.json().get("microstrategy-xstock", {})
-        price = round(float(d.get("usd", 0)), 2)
-        chg   = round(float(d.get("usd_24h_change", 0)), 2)
-        if price > 0:
-            print(f"MSTR via MSTRX: ${price} ({chg}%)")
-            return {"price": price, "change_pct": chg}
-        return None
+        price = float(d.get("usd", 0))
+        if price > 10:
+            return {"price": round(price, 2),
+                    "change_pct": round(float(d.get("usd_24h_change", 0)), 2),
+                    "source": "mstrx"}
     except Exception as e:
-        print(f"MSTRX Quote Fehler: {e}")
-        return None
+        print(f"MSTRX Fehler: {e}")
 
-def wb_get_options(ticker_id, spot):
-    """Optionskette von Webull — ~42 DTE, Calls, Delta 0.03-0.22"""
+    # Versuch 2: BMSTR (Backed MicroStrategy)
     try:
-        # Schritt 1: Verfügbare Expiry-Daten
-        url = f"https://quotes-gw.webullfintech.com/api/quote/option/expireList?tickerId={ticker_id}&count=20"
-        r   = req.get(url, headers=WEBULL_HEADERS, timeout=10)
-        expire_list = r.json()
-
-        if not expire_list:
-            return None
-
-        # Bestes Expiry ~42 DTE
-        exp_dates = [e.get("date", "") for e in expire_list if e.get("date")]
-        best_exp  = find_best_expiry_days(exp_dates, 42)
-        if not best_exp:
-            best_exp = exp_dates[0] if exp_dates else None
-        if not best_exp:
-            return None
-
-        dte = (datetime.strptime(best_exp, "%Y-%m-%d") - datetime.today()).days
-        T   = dte / 365.0
-
-        # Schritt 2: Options Chain für dieses Expiry
-        chain_url = (f"https://quotes-gw.webullfintech.com/api/quote/option/list"
-                     f"?tickerId={ticker_id}&expireDate={best_exp}&direction=call&count=50")
-        cr  = req.get(chain_url, headers=WEBULL_HEADERS, timeout=12)
-        chain_data = cr.json()
-
-        if not chain_data:
-            return None
-
-        # chain_data ist eine Liste von Options
-        options_list = chain_data if isinstance(chain_data, list) else chain_data.get("data", [])
-
-        rows = []
-        for opt in options_list:
-            try:
-                strike = float(opt.get("strikePrice", 0))
-                bid    = float(opt.get("bidPrice", 0) or 0)
-                ask    = float(opt.get("askPrice", 0) or 0)
-                mid    = round((bid + ask) / 2, 2) if bid and ask else None
-                iv_raw = float(opt.get("impVol", 0) or 0)
-                iv     = iv_raw if iv_raw > 0 else 0.88
-
-                # Delta aus Webull oder BS berechnen
-                delta_raw = opt.get("delta")
-                if delta_raw is not None:
-                    delta = round(abs(float(delta_raw)), 3)
-                else:
-                    delta = round(bs_delta(spot, strike, T, iv), 3)
-
-                if delta < 0.03 or delta > 0.22:
-                    continue
-
-                iv_pct = round(iv * 100, 1) if iv < 5 else round(iv, 1)
-
-                rows.append({
-                    "strike":        strike,
-                    "delta":         delta,
-                    "bid":           round(bid, 2) if bid else None,
-                    "ask":           round(ask, 2) if ask else None,
-                    "mid":           mid,
-                    "iv":            iv_pct,
-                    "dte":           dte,
-                    "otm_pct":       round((strike - spot) / spot * 100, 1),
-                    "volume":        int(opt.get("volume", 0) or 0),
-                    "open_interest": int(opt.get("openInterest", 0) or 0),
-                })
-            except Exception as e:
-                print(f"  Option parse Fehler: {e}")
-                continue
-
-        rows.sort(key=lambda x: x["delta"], reverse=True)
-        return {
-            "expiry":  best_exp,
-            "dte":     dte,
-            "spot":    round(spot, 2),
-            "source":  "webull",
-            "options": rows
-        }
+        r = req.get("https://api.coingecko.com/api/v3/simple/price",
+            params={"ids": "backed-microstrategy",
+                    "vs_currencies": "usd",
+                    "include_24hr_change": "true"},
+            timeout=8)
+        d = r.json().get("backed-microstrategy", {})
+        price = float(d.get("usd", 0))
+        if price > 10:
+            return {"price": round(price, 2),
+                    "change_pct": round(float(d.get("usd_24h_change", 0)), 2),
+                    "source": "bmstr"}
     except Exception as e:
-        print(f"Webull Options Fehler: {e}")
-        return None
+        print(f"BMSTR Fehler: {e}")
+
+    return None
 
 # ══════════════════════════════════════════
-# TICKER ID CACHE
+# OPTIONSKETTE — Black-Scholes
 # ══════════════════════════════════════════
-_ticker_id = None
-def get_ticker_id():
-    global _ticker_id
-    if not _ticker_id:
-        # Versuche zuerst dynamisch zu holen
-        result = wb_get_ticker_id("MSTR")
-        # Fallback: hardcoded (aus /debug verifiziert am 17.03.2026)
-        _ticker_id = result or "913323987"
-    return _ticker_id
+def build_options_chain(spot, iv=0.88, target_dte=42):
+    """Generiert Optionskette via Black-Scholes für Delta 0.03–0.22"""
+    today    = datetime.today()
+    exp_date = today + timedelta(days=target_dte)
+    # Runde auf nächsten Freitag
+    days_to_fri = (4 - exp_date.weekday()) % 7
+    exp_date = exp_date + timedelta(days=days_to_fri)
+    exp_str  = exp_date.strftime("%Y-%m-%d")
+    dte      = (exp_date - today).days
+    T        = dte / 365.0
+
+    rows = []
+    # Generiere Strikes von OTM bis weit OTM
+    for otm_pct in [i * 2.5 for i in range(2, 30)]:
+        K = round(spot * (1 + otm_pct / 100) / 5) * 5  # Runde auf $5
+        delta = round(bs_delta(spot, K, T, iv), 3)
+        if delta < 0.03 or delta > 0.22:
+            continue
+        price_bs = bs_price(spot, K, T, iv)
+        bid  = round(price_bs * 0.95, 2)
+        ask  = round(price_bs * 1.05, 2)
+        mid  = round(price_bs, 2)
+        rows.append({
+            "strike":        K,
+            "delta":         delta,
+            "bid":           bid,
+            "ask":           ask,
+            "mid":           mid,
+            "iv":            round(iv * 100, 1),
+            "dte":           dte,
+            "otm_pct":       round(otm_pct, 1),
+            "volume":        0,
+            "open_interest": 0,
+        })
+
+    # Dedupliziere nach Strike, behalte bestes Delta
+    seen = {}
+    for row in rows:
+        k = row["strike"]
+        if k not in seen or abs(row["delta"] - 0.08) < abs(seen[k]["delta"] - 0.08):
+            seen[k] = row
+    rows = sorted(seen.values(), key=lambda x: x["delta"], reverse=True)
+
+    return {
+        "expiry":  exp_str,
+        "dte":     dte,
+        "spot":    round(spot, 2),
+        "source":  "black-scholes (kein Live-Feed verfügbar)",
+        "iv_used": round(iv * 100, 1),
+        "options": rows
+    }
 
 # ══════════════════════════════════════════
 # ENDPOINTS
 # ══════════════════════════════════════════
 @app.route('/')
 def index():
-    tid = get_ticker_id()
+    mstr = fetch_mstr_price()
     return jsonify({
-        "status":    "MSTR Brain API v2.3 ✅",
-        "webull":    f"Ticker ID: {tid}" if tid else "nicht verbunden",
-        "telegram":  "aktiv" if TG_BOT_TOKEN else "nicht konfiguriert",
-        "endpoints": ["/all", "/mstr", "/btc", "/fg", "/options", "/alarm", "/debug"]
+        "status":   "MSTR Brain API v3.0 ✅",
+        "mstr":     f"${mstr['price']} via {mstr['source']}" if mstr else "kein Preis",
+        "telegram": "aktiv" if TG_BOT_TOKEN else "nicht konfiguriert",
+        "endpoints": ["/all", "/mstr", "/btc", "/fg", "/options", "/alarm"]
     })
-
-@app.route('/debug')
-def debug():
-    results = {}
-    try:
-        url = "https://quotes-gw.webullfintech.com/api/search/pc/tickers?keyword=MSTR&pageIndex=1&pageSize=5"
-        r = req.get(url, headers=WEBULL_HEADERS, timeout=10)
-        results['ticker_status'] = r.status_code
-        # Only show MSTR result
-        data = r.json().get('data', [])
-        mstr = next((x for x in data if x.get('symbol') == 'MSTR'), None)
-        results['ticker_id'] = mstr.get('tickerId') if mstr else None
-    except Exception as e:
-        results['ticker_error'] = str(e)
-    # Test quote endpoint directly
-    try:
-        tid = "913323987"
-        url = f"https://quotes-gw.webullfintech.com/api/stock/tickerQuote?tickerId={tid}&includeSecu=1"
-        r = req.get(url, headers=WEBULL_HEADERS, timeout=10)
-        results['quote_status'] = r.status_code
-        results['quote_raw'] = r.json()
-    except Exception as e:
-        results['quote_error'] = str(e)
-    # Test quote endpoint
-    try:
-        tid = "913323987"
-        url = f"https://quotes-gw.webullfintech.com/api/stock/tickerQuote?tickerId={tid}&includeSecu=1"
-        r = req.get(url, headers=WEBULL_HEADERS, timeout=10)
-        results['quote_status'] = r.status_code
-        results['quote_raw'] = r.json()
-    except Exception as e:
-        results['quote_error'] = str(e)
-    results['wb_phone_set'] = bool(WB_PHONE)
-    results['wb_email_set'] = bool(WB_EMAIL)
-    results['wb_password_set'] = bool(WB_PASSWORD)
-    if WB_PHONE or WB_EMAIL:
-        try:
-            account = WB_PHONE if WB_PHONE else WB_EMAIL
-            account_type = "1" if WB_PHONE else "2"
-            r = req.post("https://userapi.webull.com/api/passport/login/v5/account",
-                json={"account": account, "accountType": account_type,
-                      "pwd": WB_PASSWORD, "deviceId": "8a7f3d2e1c4b5a6f",
-                      "deviceName": "MSTR Brain Server", "grade": 1, "regionId": 91},
-                headers=WEBULL_HEADERS, timeout=15)
-            results['login_status'] = r.status_code
-            results['login_raw'] = r.json()
-        except Exception as e:
-            results['login_error'] = str(e)
-    return jsonify(results)
 
 @app.route('/mstr')
 def get_mstr():
     def fetch():
-        tid = get_ticker_id()
-        if not tid:
-            return {"error": "Webull Ticker ID nicht gefunden"}
-        q = wb_get_quote(tid)
+        q = fetch_mstr_price()
         if not q:
-            return {"error": "Webull Quote fehlgeschlagen"}
-        q["delayed"] = True
-        q["as_of"]   = datetime.utcnow().isoformat() + "Z"
-        return q
+            return {"error": "MSTR Preis nicht verfügbar (Markt geschlossen?)"}
+        return {**q, "as_of": datetime.utcnow().isoformat() + "Z"}
     try:
-        return jsonify(cached('mstr', fetch))
+        return jsonify(cached('mstr', fetch, ttl=60))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -347,14 +224,13 @@ def get_fg():
 @app.route('/options')
 def get_options():
     def fetch():
-        tid = get_ticker_id()
-        if not tid:
-            return {"error": "Webull Ticker ID nicht gefunden"}
-        q = wb_get_quote(tid)
+        q    = fetch_mstr_price()
         spot = q["price"] if q else 150.0
-        result = wb_get_options(tid, spot)
-        if not result:
-            return {"error": "Webull Options fehlgeschlagen"}
+        iv   = float(req.get("https://api.alternative.me/fng/?limit=1",
+               timeout=5).json()["data"][0]["value"]) / 100 * 1.5 + 0.5
+        # IV grob aus F&G schätzen: Fear=hoch, Greed=tief
+        iv   = max(0.60, min(1.40, iv))
+        result = build_options_chain(spot, iv=iv)
         result["as_of"] = datetime.utcnow().isoformat() + "Z"
         return result
     try:
@@ -365,23 +241,20 @@ def get_options():
 @app.route('/all')
 def get_all():
     def fetch_all():
-        out  = {}
-        spot = 150.0
-        tid  = get_ticker_id()
+        out = {}
 
         # MSTR
         try:
-            if tid:
-                q = wb_get_quote(tid)
-                if q:
-                    spot = q["price"]
-                    out['mstr'] = {"price": q["price"], "change_pct": q["change_pct"], "delayed": True}
-                else:
-                    out['mstr'] = {"error": "Quote fehlgeschlagen"}
+            q = fetch_mstr_price()
+            if q:
+                out['mstr'] = {**q}
+                spot = q["price"]
             else:
-                out['mstr'] = {"error": "Ticker ID nicht gefunden"}
+                out['mstr'] = {"error": "nicht verfügbar"}
+                spot = 150.0
         except Exception as e:
             out['mstr'] = {"error": str(e)}
+            spot = 150.0
 
         # BTC
         try:
@@ -396,20 +269,19 @@ def get_all():
             out['btc'] = {"error": str(e)}
 
         # Fear & Greed
+        fg_val = 43
         try:
             fg = req.get("https://api.alternative.me/fng/?limit=2", timeout=8).json()["data"]
-            out['fg'] = {"value": int(fg[0]["value"]), "label": fg[0]["value_classification"],
+            fg_val = int(fg[0]["value"])
+            out['fg'] = {"value": fg_val, "label": fg[0]["value_classification"],
                          "yesterday": int(fg[1]["value"]) if len(fg) > 1 else None}
         except Exception as e:
             out['fg'] = {"error": str(e)}
 
-        # Optionen
+        # Optionen via BS
         try:
-            if tid:
-                opts = wb_get_options(tid, spot)
-                out['options'] = opts or {"error": "Keine Optionsdaten"}
-            else:
-                out['options'] = {"error": "Ticker ID nicht gefunden"}
+            iv = max(0.60, min(1.40, fg_val / 100 * 1.5 + 0.5))
+            out['options'] = build_options_chain(spot, iv=iv)
         except Exception as e:
             out['options'] = {"error": str(e)}
 
@@ -428,68 +300,38 @@ def get_all():
 def send_alarm():
     if not TG_BOT_TOKEN or not TG_CHAT_ID:
         return jsonify({"error": "Telegram nicht konfiguriert"}), 400
-
-    d      = request.json or {}
-    t      = d.get('type', 'unknown')
-    mstr   = d.get('mstr', '?')
-    strike = d.get('strike', '?')
-    buf    = d.get('buffer', '?')
-    dte    = d.get('dte', '?')
-    delta  = d.get('delta', '?')
-    ns     = d.get('new_strike', '?')
-    prem   = d.get('premium', '?')
-    cur    = d.get('current_val', '?')
-    fg     = d.get('fg', '?')
-    btc    = d.get('btc', 0)
-    ts     = datetime.utcnow().strftime('%d.%m. %H:%M UTC')
-    btc_fmt = f"${int(btc):,}".replace(',', '.') if isinstance(btc, (int, float)) and btc else f"${btc}"
-
-    if not can_alarm(t):
-        return jsonify({"status": "cooldown"}), 200
-
-    if t == 'roll':
-        msg = (f"⚡ <b>MSTR BRAIN — JETZT ROLLEN!</b>\n🕐 {ts}\n"
-               f"━━━━━━━━━━━━━━━━━━━━━\n"
-               f"📈 MSTR:   <b>${mstr}</b>\n"
-               f"🎯 Strike: <b>${strike}</b>\n"
-               f"⚠️ Puffer: <b>{buf}%</b> — unter 6%!\n"
-               f"📅 DTE:    <b>{dte} Tage</b>\n"
-               f"━━━━━━━━━━━━━━━━━━━━━\n"
-               f"<b>Jetzt handeln:</b>\n"
-               f"① Buy-to-Close: Call ${strike}\n"
-               f"② Sell-to-Open: <b>${ns}</b> · Δ{delta} · 42 Tage\n"
-               f"③ NUR für Kredit! Kein Debit!\n"
-               f"━━━━━━━━━━━━━━━━━━━━━\n"
-               f"🌍 F&G: {fg} · BTC: {btc_fmt}")
-    elif t == 'warn':
-        msg = (f"⚠️ <b>MSTR BRAIN — Strike nähert sich</b>\n🕐 {ts}\n"
-               f"━━━━━━━━━━━━━━━━━━━━━\n"
-               f"📈 MSTR:   <b>${mstr}</b>\n"
-               f"🎯 Strike: <b>${strike}</b>\n"
-               f"📊 Puffer: <b>{buf}%</b> — unter 12%\n"
-               f"📅 DTE:    <b>{dte} Tage</b>\n"
-               f"━━━━━━━━━━━━━━━━━━━━━\n"
-               f"👀 Beobachten · Roll auf ${ns} vorbereiten · Δ{delta}\n"
-               f"🌍 F&G: {fg} · BTC: {btc_fmt}")
-    elif t == 'profit':
-        try:
-            gewinn = str(round((float(prem) - float(cur)) * 200))
-        except:
-            gewinn = '?'
-        msg = (f"💰 <b>MSTR BRAIN — Gewinnmitnahme!</b>\n🕐 {ts}\n"
-               f"━━━━━━━━━━━━━━━━━━━━━\n"
-               f"📈 MSTR:     <b>${mstr}</b>\n"
-               f"🎯 Strike:   <b>${strike}</b>\n"
-               f"💵 Kassiert: <b>${prem}/Aktie</b>\n"
-               f"📉 Aktuell:  <b>${cur}/Aktie</b>\n"
-               f"✅ 75%+ Zeitwert verloren!\n"
-               f"━━━━━━━━━━━━━━━━━━━━━\n"
-               f"① Buy-to-Close: ~${cur}/Aktie\n"
-               f"② Gewinn: ~<b>${gewinn}</b> (2 Kontrakte)\n"
-               f"③ Neuer Zyklus: ${ns} · Δ{delta} · 42 Tage")
+    d = request.json or {}
+    t = d.get('type','unknown'); mstr=d.get('mstr','?'); strike=d.get('strike','?')
+    buf=d.get('buffer','?'); dte=d.get('dte','?'); delta=d.get('delta','?')
+    ns=d.get('new_strike','?'); prem=d.get('premium','?'); cur=d.get('current_val','?')
+    fg=d.get('fg','?'); btc=d.get('btc',0)
+    ts = datetime.utcnow().strftime('%d.%m. %H:%M UTC')
+    btc_fmt = f"${int(btc):,}".replace(',','.') if isinstance(btc,(int,float)) and btc else f"${btc}"
+    if not can_alarm(t): return jsonify({"status":"cooldown"}), 200
+    if t=='roll':
+        msg=(f"⚡ <b>MSTR BRAIN — JETZT ROLLEN!</b>\n🕐 {ts}\n━━━━━━━━━━━━━━━━━━━━━\n"
+             f"📈 MSTR: <b>${mstr}</b>\n🎯 Strike: <b>${strike}</b>\n"
+             f"⚠️ Puffer: <b>{buf}%</b> — unter 6%!\n📅 DTE: <b>{dte} Tage</b>\n"
+             f"━━━━━━━━━━━━━━━━━━━━━\n① Buy-to-Close: Call ${strike}\n"
+             f"② Sell-to-Open: <b>${ns}</b> · Δ{delta} · 42 Tage\n③ NUR für Kredit!\n"
+             f"━━━━━━━━━━━━━━━━━━━━━\n🌍 F&G: {fg} · BTC: {btc_fmt}")
+    elif t=='warn':
+        msg=(f"⚠️ <b>MSTR BRAIN — Strike nähert sich</b>\n🕐 {ts}\n━━━━━━━━━━━━━━━━━━━━━\n"
+             f"📈 MSTR: <b>${mstr}</b>\n🎯 Strike: <b>${strike}</b>\n"
+             f"📊 Puffer: <b>{buf}%</b> — unter 12%\n📅 DTE: <b>{dte} Tage</b>\n"
+             f"━━━━━━━━━━━━━━━━━━━━━\n👀 Roll auf ${ns} vorbereiten · Δ{delta}\n"
+             f"🌍 F&G: {fg} · BTC: {btc_fmt}")
+    elif t=='profit':
+        try: gewinn=str(round((float(prem)-float(cur))*200))
+        except: gewinn='?'
+        msg=(f"💰 <b>MSTR BRAIN — Gewinnmitnahme!</b>\n🕐 {ts}\n━━━━━━━━━━━━━━━━━━━━━\n"
+             f"📈 MSTR: <b>${mstr}</b>\n🎯 Strike: <b>${strike}</b>\n"
+             f"💵 Kassiert: <b>${prem}/Aktie</b>\n📉 Aktuell: <b>${cur}/Aktie</b>\n"
+             f"✅ 75%+ Zeitwert verloren!\n━━━━━━━━━━━━━━━━━━━━━\n"
+             f"① BTC ~${cur}/Aktie\n② Gewinn: ~<b>${gewinn}</b>\n"
+             f"③ Neuer Zyklus: ${ns} · Δ{delta} · 42 Tage")
     else:
-        msg = f"🔔 MSTR Brain: {t}\nMSTR: ${mstr} · Strike: ${strike}"
-
+        msg=f"🔔 MSTR Brain: {t}\nMSTR: ${mstr} · Strike: ${strike}"
     ok = tg_send(msg)
     return jsonify({"status": "sent" if ok else "error", "type": t})
 
@@ -497,50 +339,30 @@ def send_alarm():
 # MORGEN-BRIEFING 08:00 UTC
 # ══════════════════════════════════════════
 def send_morning_briefing():
-    if not TG_BOT_TOKEN or not TG_CHAT_ID:
-        return
+    if not TG_BOT_TOKEN or not TG_CHAT_ID: return
     try:
-        tid  = get_ticker_id()
-        mstr, mchg = 0, 0
-        if tid:
-            q = wb_get_quote(tid)
-            if q:
-                mstr = q["price"]
-                mchg = q["change_pct"]
-
+        q    = fetch_mstr_price()
+        mstr = q["price"] if q else 0
+        mchg = q.get("change_pct", 0) if q else 0
         r    = req.get("https://api.coingecko.com/api/v3/simple/price",
-               params={"ids": "bitcoin", "vs_currencies": "usd",
-                       "include_24hr_change": "true"}, timeout=8)
-        btcd = r.json()["bitcoin"]
-        btc  = round(btcd["usd"])
-        bchg = round(btcd.get("usd_24h_change", 0), 2)
-
+               params={"ids":"bitcoin","vs_currencies":"usd","include_24hr_change":"true"}, timeout=8)
+        btcd = r.json()["bitcoin"]; btc=round(btcd["usd"]); bchg=round(btcd.get("usd_24h_change",0),2)
         fgd  = req.get("https://api.alternative.me/fng/?limit=1", timeout=8).json()["data"][0]
-        fg, fgl = int(fgd["value"]), fgd["value_classification"]
-
-        ts    = datetime.utcnow().strftime('%d.%m.%Y')
-        btc_f = f"${btc:,}".replace(',', '.')
-        msg   = (f"☀️ <b>MSTR Brain — Morgen-Briefing {ts}</b>\n"
-                 f"━━━━━━━━━━━━━━━━━━━━━\n"
-                 f"📈 MSTR: <b>${mstr}</b>  {'+' if mchg >= 0 else ''}{mchg}%\n"
-                 f"₿  BTC:  <b>{btc_f}</b>  {'+' if bchg >= 0 else ''}{bchg}%\n"
-                 f"😱 F&G:  <b>{fg}</b> — {fgl}\n"
-                 f"━━━━━━━━━━━━━━━━━━━━━\n"
-                 f"App öffnen für Optionskette & Empfehlung 📱")
+        fg,fgl = int(fgd["value"]),fgd["value_classification"]
+        ts = datetime.utcnow().strftime('%d.%m.%Y')
+        msg=(f"☀️ <b>MSTR Brain — Morgen-Briefing {ts}</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+             f"📈 MSTR: <b>${mstr}</b>  {'+' if mchg>=0 else ''}{mchg}%\n"
+             f"₿  BTC:  <b>${btc:,}</b>  {'+' if bchg>=0 else ''}{bchg}%\n"
+             f"😱 F&G:  <b>{fg}</b> — {fgl}\n━━━━━━━━━━━━━━━━━━━━━\nApp öffnen 📱")
         tg_send(msg)
         print(f"Morgen-Briefing gesendet {ts}")
-    except Exception as e:
-        print(f"Morgen-Briefing Fehler: {e}")
+    except Exception as e: print(f"Morgen-Briefing Fehler: {e}")
 
 def run_scheduler():
     schedule.every().day.at("08:00").do(send_morning_briefing)
-    while True:
-        schedule.run_pending()
-        time.sleep(30)
+    while True: schedule.run_pending(); time.sleep(30)
 
 if __name__ == '__main__':
-    # Ticker ID beim Start voraufladen
-    threading.Thread(target=get_ticker_id, daemon=True).start()
     threading.Thread(target=run_scheduler, daemon=True).start()
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
