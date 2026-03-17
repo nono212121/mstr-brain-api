@@ -78,14 +78,30 @@ def strike_from_delta(S, delta, T, sigma):
 # MSTR PREIS — CoinGecko MSTRX
 # ══════════════════════════════════════════
 def fetch_mstr_price():
-    """MSTR via tokenisierten MSTRX Token auf CoinGecko"""
-    # Versuch 1: MSTRX (MicroStrategy xStock)
+    """MSTR Preis - mehrere Quellen"""
+
+    # Versuch 1: Yahoo Finance (direkt, kein CORS-Problem auf Server)
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        r = req.get("https://query1.finance.yahoo.com/v8/finance/chart/MSTR",
+            params={"interval": "1d", "range": "1d"},
+            headers=headers, timeout=10)
+        data = r.json()
+        meta = data["chart"]["result"][0]["meta"]
+        price = float(meta.get("regularMarketPrice") or meta.get("previousClose") or 0)
+        prev  = float(meta.get("previousClose") or price)
+        if price > 10:
+            chg = round((price - prev) / prev * 100, 2) if prev else 0
+            print(f"MSTR via Yahoo: ${price}")
+            return {"price": round(price, 2), "change_pct": chg, "source": "yahoo"}
+    except Exception as e:
+        print(f"Yahoo Fehler: {e}")
+
+    # Versuch 2: MSTRX auf CoinGecko
     try:
         r = req.get("https://api.coingecko.com/api/v3/simple/price",
             params={"ids": "microstrategy-xstock",
-                    "vs_currencies": "usd",
-                    "include_24hr_change": "true"},
-            timeout=8)
+                    "vs_currencies": "usd", "include_24hr_change": "true"}, timeout=8)
         d = r.json().get("microstrategy-xstock", {})
         price = float(d.get("usd", 0))
         if price > 10:
@@ -95,13 +111,11 @@ def fetch_mstr_price():
     except Exception as e:
         print(f"MSTRX Fehler: {e}")
 
-    # Versuch 2: BMSTR (Backed MicroStrategy)
+    # Versuch 3: BMSTR auf CoinGecko
     try:
         r = req.get("https://api.coingecko.com/api/v3/simple/price",
             params={"ids": "backed-microstrategy",
-                    "vs_currencies": "usd",
-                    "include_24hr_change": "true"},
-            timeout=8)
+                    "vs_currencies": "usd", "include_24hr_change": "true"}, timeout=8)
         d = r.json().get("backed-microstrategy", {})
         price = float(d.get("usd", 0))
         if price > 10:
@@ -199,7 +213,9 @@ def get_btc():
         r = req.get("https://api.coingecko.com/api/v3/simple/price",
             params={"ids": "bitcoin", "vs_currencies": "usd",
                     "include_24hr_change": "true", "include_7d_change": "true"}, timeout=8)
-        d = r.json()["bitcoin"]
+        d = r.json().get("bitcoin", {})
+        if not d or not d.get("usd"):
+            raise Exception("Bitcoin data missing from CoinGecko response")
         return {"price": round(d["usd"]),
                 "change_24h": round(d.get("usd_24h_change", 0), 2),
                 "change_7d":  round(d.get("usd_7d_change", 0), 2),
@@ -261,10 +277,14 @@ def get_all():
             r   = req.get("https://api.coingecko.com/api/v3/simple/price",
                   params={"ids": "bitcoin", "vs_currencies": "usd",
                           "include_24hr_change": "true", "include_7d_change": "true"}, timeout=8)
-            btc = r.json()["bitcoin"]
-            out['btc'] = {"price": round(btc["usd"]),
-                          "change_24h": round(btc.get("usd_24h_change", 0), 2),
-                          "change_7d":  round(btc.get("usd_7d_change", 0), 2)}
+            rj  = r.json()
+            btc = rj.get("bitcoin", {})
+            if btc and btc.get("usd"):
+                out['btc'] = {"price": round(btc["usd"]),
+                              "change_24h": round(btc.get("usd_24h_change", 0), 2),
+                              "change_7d":  round(btc.get("usd_7d_change", 0), 2)}
+            else:
+                out['btc'] = {"error": f"CoinGecko: {rj}"}
         except Exception as e:
             out['btc'] = {"error": str(e)}
 
