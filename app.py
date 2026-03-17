@@ -96,50 +96,10 @@ WEBULL_HEADERS = {
 }
 
 def wb_login():
-    """Webull Login — Email oder Telefonnummer"""
-    if not WB_PASSWORD:
-        return None
+    # Webull blockiert Logins von Cloud-Server-IPs (503)
+    # Quote + Optionen funktionieren als public endpoints ohne Login
+    return None
 
-    # Telefon hat Priorität wenn gesetzt, sonst Email
-    if WB_PHONE:
-        account      = WB_PHONE      # z.B. +4915112345678
-        account_type = "1"           # 1 = Telefon
-    elif WB_EMAIL:
-        account      = WB_EMAIL
-        account_type = "2"           # 2 = Email
-    else:
-        print("Webull: weder WB_EMAIL noch WB_PHONE gesetzt")
-        return None
-
-    try:
-        url = "https://userapi.webull.com/api/passport/login/v5/account"
-        payload = {
-            "account":     account,
-            "accountType": account_type,
-            "pwd":         WB_PASSWORD,
-            "deviceId":    "8a7f3d2e1c4b5a6f",
-            "deviceName":  "MSTR Brain Server",
-            "grade":       1,
-            "regionId":    91,  # Germany
-        }
-        r = req.post(url, json=payload, headers=WEBULL_HEADERS, timeout=15)
-        d = r.json()
-        token = d.get("accessToken")
-        if not token:
-            url2 = "https://userapi.webull.com/api/passport/login/account"
-            r2   = req.post(url2, json=payload, headers=WEBULL_HEADERS, timeout=15)
-            d2   = r2.json()
-            token = d2.get("accessToken") or d2.get("data", {}).get("accessToken")
-        if token:
-            _wb_session["token"]   = token
-            _wb_session["expires"] = time.time() + 3600 * 6
-            print(f"Webull Login erfolgreich ({account_type=='1' and 'Telefon' or 'Email'})")
-            return token
-        print(f"Webull Login fehlgeschlagen: {d}")
-        return None
-    except Exception as e:
-        print(f"Webull Login Fehler: {e}")
-        return None
 
 def wb_get_token():
     """Token holen, ggf. neu einloggen"""
@@ -154,7 +114,7 @@ def wb_get_ticker_id(symbol="MSTR"):
         r = req.get(url, headers=WEBULL_HEADERS, timeout=10)
         data = r.json().get("data", [])
         for item in data:
-            if item.get("tickerSymbol") == symbol and item.get("exchangeCode") in ("NASDAQ", "NYSE"):
+            if item.get("tickerSymbol") == symbol and item.get("exchangeCode") in ("NASDAQ", "NYSE", "NSQ", "NMS", "NGS"):
                 return str(item["tickerId"])
         return None
     except Exception as e:
