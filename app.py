@@ -226,7 +226,10 @@ _ticker_id = None
 def get_ticker_id():
     global _ticker_id
     if not _ticker_id:
-        _ticker_id = wb_get_ticker_id("MSTR")
+        # Versuche zuerst dynamisch zu holen
+        result = wb_get_ticker_id("MSTR")
+        # Fallback: hardcoded (aus /debug verifiziert am 17.03.2026)
+        _ticker_id = result or "913323987"
     return _ticker_id
 
 # ══════════════════════════════════════════
